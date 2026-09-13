@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'expo-router';
 import { Drawer, DrawerContentScrollView, DrawerItem, useDrawerStatus } from 'expo-router/drawer';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, StyleSheet, Text, View } from 'react-native';
 
 import { api, clearAuthToken, logout } from '../../src/api/client';
 
@@ -21,13 +21,17 @@ function CleanifyDrawerContent(props) {
   const drawerStatus = useDrawerStatus();
   const [user, setUser] = useState(null);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [photoFailed, setPhotoFailed] = useState(false);
 
   useEffect(() => {
     let active = true;
 
     api.get('/me')
       .then((response) => {
-        if (active) setUser(response.data.user);
+        if (active) {
+          setUser(response.data.user);
+          setPhotoFailed(false);
+        }
       })
       .catch(async (error) => {
         if (error.response?.status === 401) {
@@ -59,9 +63,7 @@ function CleanifyDrawerContent(props) {
       <View style={styles.drawerHeader}>
         {user ? (
           <>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{user.name?.charAt(0).toUpperCase()}</Text>
-            </View>
+            {user.profile_photo_url && !photoFailed ? <Image source={{ uri: user.profile_photo_url }} style={styles.drawerPhoto} onError={() => setPhotoFailed(true)} /> : <View style={styles.avatar}><Text style={styles.avatarText}>{user.name?.charAt(0).toUpperCase()}</Text></View>}
             <Text style={styles.userName}>{user.name}</Text>
             <Text style={styles.userEmail}>{user.email}</Text>
           </>
@@ -133,6 +135,7 @@ const styles = StyleSheet.create({
   drawerContent: { flex: 1, paddingTop: 0 },
   drawerHeader: { minHeight: 190, backgroundColor: '#17843f', paddingHorizontal: 22, paddingTop: 38, paddingBottom: 22, justifyContent: 'flex-end' },
   avatar: { width: 54, height: 54, borderRadius: 27, backgroundColor: '#ffffff', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
+  drawerPhoto: { width: 54, height: 54, borderRadius: 27, backgroundColor: '#d8f3df', marginBottom: 12 },
   avatarText: { color: '#17843f', fontSize: 22, fontWeight: '800' },
   userName: { color: '#ffffff', fontSize: 18, fontWeight: '800' },
   userEmail: { marginTop: 3, color: '#d8f3df', fontSize: 13 },

@@ -9,7 +9,7 @@ import { api, clearAuthToken, logout } from '../../src/api/client';
 const ITEMS = [
   { label: 'Home', icon: 'home', href: '/tabs' },
   { label: 'Garbage Schedule', icon: 'calendar-alt', href: '/tabs/schedule' },
-  { label: 'Create Report', icon: 'plus-circle', href: '/tabs/report' },
+  { label: 'Community Reports', icon: 'comments', href: '/tabs/report' },
   { label: 'Truck Tracker', icon: 'truck', href: '/tabs/tracker' },
   { label: 'Profile', icon: 'user-circle', href: '/tabs/profile' },
   { label: 'Settings', icon: 'cog', href: '/tabs/settings' },

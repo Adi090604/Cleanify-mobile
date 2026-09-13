@@ -9,6 +9,7 @@ import { api, clearAuthToken, logout } from '../../src/api/client';
 const ITEMS = [
   { label: 'Home', icon: 'home', href: '/tabs' },
   { label: 'Garbage Schedule', icon: 'calendar-alt', href: '/tabs/schedule' },
+  { label: 'Notifications', icon: 'bell', href: '/tabs/notifications' },
   { label: 'Community Reports', icon: 'comments', href: '/tabs/report' },
   { label: 'Truck Tracker', icon: 'truck', href: '/tabs/tracker' },
   { label: 'Profile', icon: 'user-circle', href: '/tabs/profile' },
@@ -68,7 +69,7 @@ function CleanifyDrawerContent(props) {
             <Text style={styles.userEmail}>{user.email}</Text>
           </>
         ) : (
-          <ActivityIndicator color="#ffffff" />
+          <ActivityIndicator color="#17843f" />
         )}
       </View>
 
@@ -78,12 +79,13 @@ function CleanifyDrawerContent(props) {
             key={item.href}
             label={item.label}
             focused={pathname === item.href || (item.href === '/tabs' && pathname === '/tabs/')}
-            icon={({ color, size }) => <FontAwesome5 name={item.icon} color={color} size={size} />}
+            icon={({ color }) => <View style={styles.itemIcon}><FontAwesome5 name={item.icon} color={color} size={16} /></View>}
             onPress={() => goTo(item.href)}
             activeTintColor="#17843f"
             activeBackgroundColor="#ecf8ef"
             inactiveTintColor="#374151"
             labelStyle={styles.itemLabel}
+            style={styles.drawerItem}
           />
         ))}
       </View>
@@ -91,10 +93,11 @@ function CleanifyDrawerContent(props) {
       <View style={styles.drawerFooter}>
         <DrawerItem
           label={loggingOut ? 'Signing out...' : 'Logout'}
-          icon={() => <FontAwesome5 name="sign-out-alt" color="#b91c1c" size={20} />}
+          icon={() => <View style={styles.itemIcon}><FontAwesome5 name="sign-out-alt" color="#b91c1c" size={16} /></View>}
           onPress={signOut}
           inactiveTintColor="#b91c1c"
           labelStyle={styles.itemLabel}
+          style={styles.drawerItem}
         />
       </View>
     </DrawerContentScrollView>
@@ -127,19 +130,28 @@ export default function AuthenticatedDrawerLayout() {
           drawerItemStyle: { display: 'none' },
         }}
       />
+      <Drawer.Screen
+        name="notifications"
+        options={{
+          title: 'Notifications',
+          drawerItemStyle: { display: 'none' },
+        }}
+      />
     </Drawer>
   );
 }
 
 const styles = StyleSheet.create({
-  drawerContent: { flex: 1, paddingTop: 0 },
-  drawerHeader: { minHeight: 190, backgroundColor: '#17843f', paddingHorizontal: 22, paddingTop: 38, paddingBottom: 22, justifyContent: 'flex-end' },
-  avatar: { width: 54, height: 54, borderRadius: 27, backgroundColor: '#ffffff', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
-  drawerPhoto: { width: 54, height: 54, borderRadius: 27, backgroundColor: '#d8f3df', marginBottom: 12 },
-  avatarText: { color: '#17843f', fontSize: 22, fontWeight: '800' },
-  userName: { color: '#ffffff', fontSize: 18, fontWeight: '800' },
-  userEmail: { marginTop: 3, color: '#d8f3df', fontSize: 13 },
-  drawerItems: { flex: 1, paddingTop: 12, paddingHorizontal: 4 },
-  drawerFooter: { borderTopWidth: 1, borderTopColor: '#e5e9e7', paddingTop: 8, paddingBottom: 12, paddingHorizontal: 4 },
-  itemLabel: { fontSize: 14, fontWeight: '700' },
+  drawerContent: { flex: 1, paddingTop: 0, backgroundColor: '#fbfcfb' },
+  drawerHeader: { minHeight: 205, backgroundColor: '#fbfcfb', paddingHorizontal: 22, paddingTop: 34, paddingBottom: 22, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 1, borderBottomColor: '#e8ece9' },
+  avatar: { width: 78, height: 78, borderRadius: 39, backgroundColor: '#e4f4e8', borderWidth: 3, borderColor: '#fff', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
+  drawerPhoto: { width: 78, height: 78, borderRadius: 39, backgroundColor: '#e4f4e8', borderWidth: 3, borderColor: '#fff', marginBottom: 12 },
+  avatarText: { color: '#17843f', fontSize: 29, fontWeight: '800' },
+  userName: { color: '#18211c', fontSize: 18, fontWeight: '800', textAlign: 'center' },
+  userEmail: { marginTop: 4, color: '#78817c', fontSize: 12, textAlign: 'center' },
+  drawerItems: { flex: 1, paddingTop: 10, paddingHorizontal: 9 },
+  drawerItem: { minHeight: 43, borderRadius: 10, marginVertical: 1 },
+  itemIcon: { width: 22, alignItems: 'center' },
+  drawerFooter: { borderTopWidth: 1, borderTopColor: '#e5e9e7', paddingTop: 7, paddingBottom: 11, paddingHorizontal: 9 },
+  itemLabel: { fontSize: 13, fontWeight: '600', marginLeft: -3 },
 });

@@ -8,40 +8,51 @@ import { api, clearAuthToken } from '../../../src/api/client';
 
 const REFRESH_INTERVAL = 30_000;
 const DEFAULT_CENTER = { latitude: 9.787, longitude: 125.4928 };
+const hasValidCoordinates = (item) => {
+  const latitude = Number(item?.latitude);
+  const longitude = Number(item?.longitude);
+  return Number.isFinite(latitude) && Number.isFinite(longitude) && latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180;
+};
 const MAP_HTML = `<!DOCTYPE html><html><head>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"><link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
-<style>html,body,#map{width:100%;height:100%;margin:0;background:#e8eee9}.leaflet-container{font-family:Arial,sans-serif}.pin{width:30px;height:30px;border:3px solid #fff;border-radius:50% 50% 50% 0;box-shadow:0 2px 7px #0005;transform:rotate(-45deg)}.pin span{display:block;color:#fff;font-size:13px;line-height:24px;text-align:center;transform:rotate(45deg)}</style>
-</head><body><div id="map"></div><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script><script>
-(function(){
- var map=L.map('map').setView([9.7870,125.4928],13),markers={},zones={},routeLayer=null,initialized=false;
- var cluster=L.markerClusterGroup({showCoverageOnHover:false});map.addLayer(cluster);
- var colors={active:'#17843f',on_break:'#d99a08',offline:'#dc2626',maintenance:'#2563eb'};
- L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>',maxZoom:19}).addTo(map);
- function icon(status){var color=colors[status]||'#6b7280';return L.divIcon({className:'',html:'<div class="pin" style="background:'+color+'"><span>&#128666;</span></div>',iconSize:[30,30],iconAnchor:[15,30]});}
- window.updateTrucks=function(payload){
-  var seen={};
-  (payload.trucks||[]).forEach(function(truck){
-   if(typeof truck.latitude!=='number'||typeof truck.longitude!=='number')return;
-   seen[truck.id]=true;
-   if(markers[truck.id])markers[truck.id].setLatLng([truck.latitude,truck.longitude]).setIcon(icon(truck.status));
-   else {markers[truck.id]=L.marker([truck.latitude,truck.longitude],{icon:icon(truck.status)});cluster.addLayer(markers[truck.id]);}
-   markers[truck.id].bindTooltip(String(truck.code),{direction:'top',offset:[0,-25]});
-  });
-  Object.keys(markers).forEach(function(id){if(!seen[id]){cluster.removeLayer(markers[id]);delete markers[id];}});
-  if(!initialized&&payload.center){map.setView([payload.center.latitude,payload.center.longitude],payload.zoom||13);initialized=true;}
- };
- window.updateZones=function(items,selected){
-  var seen={};(items||[]).forEach(function(zone,index){seen[zone.id]=true;var color='hsl('+((index*60)%360)+',70%,45%)';
-   if(!zones[zone.id])zones[zone.id]=L.circle([zone.latitude,zone.longitude],{radius:600,color:color,fillColor:color,weight:1}).addTo(map);
-   zones[zone.id].setStyle({fillOpacity:String(zone.id)===String(selected)?.3:.1,opacity:String(zone.id)===String(selected)?.6:.3});
-  });Object.keys(zones).forEach(function(id){if(!seen[id]){map.removeLayer(zones[id]);delete zones[id];}});
-  if(selected&&zones[selected])map.setView(zones[selected].getLatLng(),14);
- };
- window.focusTruck=function(id){if(markers[id]){map.setView(markers[id].getLatLng(),15);markers[id].openTooltip();}};
- window.showRoute=function(points){if(routeLayer)map.removeLayer(routeLayer);if(!points||!points.length)return;routeLayer=L.polyline(points.map(function(p){return[p.latitude,p.longitude];}),{color:'#2563eb',weight:4,opacity:.7}).addTo(map);map.fitBounds(routeLayer.getBounds(),{padding:[30,30]});};
- map.whenReady(function(){window.ReactNativeWebView.postMessage(JSON.stringify({type:'map_ready'}));});
-})();</script></body></html>`;
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>html,body,#map{width:100%;height:100%;min-height:260px;margin:0;background:#e8eee9}.leaflet-container{font-family:Arial,sans-serif}.pin{width:30px;height:30px;border:3px solid #fff;border-radius:50% 50% 50% 0;box-shadow:0 2px 7px #0005;transform:rotate(-45deg)}.pin span{display:block;color:#fff;font-size:13px;line-height:24px;text-align:center;transform:rotate(45deg)}</style>
+</head><body><div id="map"></div>
+<script>
+ function post(message){if(window.ReactNativeWebView)window.ReactNativeWebView.postMessage(JSON.stringify(message));}
+ function mapError(message){post({type:'mapError',message:String(message||'Unknown map error')});}
+ window.onerror=function(message,source,line,column,error){mapError(error&&error.message?error.message:message);return false;};
+ window.addEventListener('unhandledrejection',function(event){mapError(event.reason&&event.reason.message?event.reason.message:event.reason);});
+</script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" onerror="mapError('Leaflet failed to load from the CDN')"></script>
+<script>
+document.addEventListener('DOMContentLoaded',function(){
+ try {
+  if(!window.L)throw new Error('Leaflet is unavailable');
+  var map=L.map('map').setView([9.7870,125.4928],13),markers={},zones={},routeLayer=null,initialized=false;
+  var cluster=typeof L.markerClusterGroup==='function'?L.markerClusterGroup({showCoverageOnHover:false}):L.layerGroup();
+  cluster.addTo(map);
+  var colors={active:'#17843f',on_break:'#d99a08',offline:'#dc2626',maintenance:'#2563eb'};
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>',maxZoom:19}).addTo(map);
+  function valid(lat,lng){return Number.isFinite(lat)&&Number.isFinite(lng)&&lat>=-90&&lat<=90&&lng>=-180&&lng<=180;}
+  function icon(status){var color=colors[status]||'#6b7280';return L.divIcon({className:'',html:'<div class="pin" style="background:'+color+'"><span>&#128666;</span></div>',iconSize:[30,30],iconAnchor:[15,30]});}
+  window.updateTrucks=function(payload){
+   var seen={};(payload.trucks||[]).forEach(function(truck){var lat=Number(truck.latitude),lng=Number(truck.longitude);if(!valid(lat,lng))return;
+    seen[truck.id]=true;if(markers[truck.id])markers[truck.id].setLatLng([lat,lng]).setIcon(icon(truck.status));else{markers[truck.id]=L.marker([lat,lng],{icon:icon(truck.status)});cluster.addLayer(markers[truck.id]);}
+    markers[truck.id].bindTooltip(String(truck.code||''),{direction:'top',offset:[0,-25]});
+   });Object.keys(markers).forEach(function(id){if(!seen[id]){cluster.removeLayer(markers[id]);delete markers[id];}});
+   var center=payload.center||{};var centerLat=Number(center.latitude),centerLng=Number(center.longitude);if(!initialized&&valid(centerLat,centerLng)){map.setView([centerLat,centerLng],Number(payload.zoom)||13);initialized=true;}
+  };
+  window.updateZones=function(items,selected){var seen={};(items||[]).forEach(function(zone,index){var lat=Number(zone.latitude),lng=Number(zone.longitude);if(!valid(lat,lng))return;
+   seen[zone.id]=true;var color='hsl('+((index*60)%360)+',70%,45%)';if(!zones[zone.id])zones[zone.id]=L.circle([lat,lng],{radius:600,color:color,fillColor:color,weight:1}).addTo(map);
+   var active=String(zone.id)===String(selected);zones[zone.id].setStyle({fillOpacity:active ? 0.3 : 0.1,opacity:active ? 0.6 : 0.3});
+  });Object.keys(zones).forEach(function(id){if(!seen[id]){map.removeLayer(zones[id]);delete zones[id];}});if(selected&&zones[selected])map.setView(zones[selected].getLatLng(),14);};
+  window.focusTruck=function(id){if(markers[id]){map.setView(markers[id].getLatLng(),15);markers[id].openTooltip();}};
+  window.showRoute=function(points){if(routeLayer)map.removeLayer(routeLayer);var validPoints=(points||[]).map(function(p){return[Number(p.latitude),Number(p.longitude)];}).filter(function(p){return valid(p[0],p[1]);});if(!validPoints.length)return;routeLayer=L.polyline(validPoints,{color:'#2563eb',weight:4,opacity:.7}).addTo(map);map.fitBounds(routeLayer.getBounds(),{padding:[30,30]});};
+  setTimeout(function(){map.invalidateSize();post({type:'map_ready'});},0);
+ } catch(error){mapError(error&&error.message?error.message:error);}
+});
+</script></body></html>`;
 
 const STATUS_COLORS = {
   active: { background: '#dcfce7', text: '#15803d' },
@@ -62,7 +73,8 @@ export default function TrackerScreen() {
   const [routeLoading, setRouteLoading] = useState(null);
   const [mapConfig, setMapConfig] = useState({ center: DEFAULT_CENTER, zoom: 13 });
   const [mapReady, setMapReady] = useState(false);
-  const [mapError, setMapError] = useState(false);
+  const [mapError, setMapError] = useState(null);
+  const [mapKey, setMapKey] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
@@ -100,9 +112,18 @@ export default function TrackerScreen() {
 
   useEffect(() => {
     if (!mapReady) return;
-    webView.current?.injectJavaScript(`window.updateTrucks(${JSON.stringify({ trucks, center: mapConfig.center, zoom: mapConfig.zoom })});true;`);
-    webView.current?.injectJavaScript(`window.updateZones(${JSON.stringify(zones)},${JSON.stringify(selectedZone)});true;`);
+    const validTrucks = trucks.filter(hasValidCoordinates).map((truck) => ({ ...truck, latitude: Number(truck.latitude), longitude: Number(truck.longitude) }));
+    const validZones = zones.filter(hasValidCoordinates).map((zone) => ({ ...zone, latitude: Number(zone.latitude), longitude: Number(zone.longitude) }));
+    const center = hasValidCoordinates(mapConfig.center) ? mapConfig.center : DEFAULT_CENTER;
+    webView.current?.injectJavaScript(`window.updateTrucks(${JSON.stringify({ trucks: validTrucks, center, zoom: mapConfig.zoom })});true;`);
+    webView.current?.injectJavaScript(`window.updateZones(${JSON.stringify(validZones)},${JSON.stringify(selectedZone)});true;`);
   }, [mapReady, mapConfig, selectedZone, trucks, zones]);
+
+  useEffect(() => {
+    if (mapReady || mapError) return undefined;
+    const timeout = setTimeout(() => setMapError('Leaflet did not initialize within 15 seconds.'), 15_000);
+    return () => clearTimeout(timeout);
+  }, [mapError, mapKey, mapReady]);
 
   const statuses = useMemo(() => [...new Set(trucks.map((truck) => truck.status))], [trucks]);
   const filteredTrucks = useMemo(() => {
@@ -142,11 +163,11 @@ export default function TrackerScreen() {
       </ScrollView></> : null}
       <View style={styles.liveRow}><Text style={styles.liveText}>● Live updating · Refresh in {countdown}s</Text><TouchableOpacity onPress={() => loadTrucks({ refresh: true })}><Text style={styles.refreshButton}>Refresh now</Text></TouchableOpacity></View>
       <View style={styles.mapFrame}>
-        <WebView ref={webView} style={styles.map} source={{ html: MAP_HTML, baseUrl: 'https://localhost/' }} originWhitelist={['https://*']} javaScriptEnabled domStorageEnabled
-          onMessage={(event) => { try { if (JSON.parse(event.nativeEvent.data).type === 'map_ready') setMapReady(true); } catch {} }}
-          onError={() => setMapError(true)} onHttpError={() => setMapError(true)} />
+        <WebView key={mapKey} ref={webView} style={styles.map} source={{ html: MAP_HTML, baseUrl: 'https://localhost/' }} originWhitelist={['https://*']} javaScriptEnabled domStorageEnabled nestedScrollEnabled
+          onMessage={(event) => { try { const message = JSON.parse(event.nativeEvent.data); if (message.type === 'map_ready') { setMapReady(true); setMapError(null); } else if (message.type === 'mapError') { setMapReady(false); setMapError(message.message || 'Unknown map error'); } } catch { setMapError('The map returned an unreadable error.'); } }}
+          onError={(event) => { setMapReady(false); setMapError(event.nativeEvent.description || 'The map WebView could not load.'); }} />
         {!mapReady && !mapError ? <View style={styles.mapState}><ActivityIndicator color="#17843f" /><Text style={styles.mapStateText}>Loading map...</Text></View> : null}
-        {mapError ? <View style={styles.mapState}><Text style={styles.mapStateText}>Map unavailable. Check your connection.</Text></View> : null}
+        {mapError ? <View style={styles.mapState}><Text style={styles.mapStateText}>Map unavailable: {mapError}</Text><TouchableOpacity style={styles.mapRetry} onPress={() => { setMapError(null); setMapReady(false); setMapKey((key) => key + 1); }}><Text style={styles.mapRetryText}>Retry Map</Text></TouchableOpacity></View> : null}
       </View>
       <View style={styles.sectionRow}><Text style={styles.sectionTitle}>Active Trucks</Text><Text style={styles.refreshNote}>{filteredTrucks.length} shown · {trucks.length} total</Text></View>
       {loading ? <ActivityIndicator color="#17843f" size="large" /> : null}
@@ -182,6 +203,7 @@ const styles = StyleSheet.create({
   liveRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4, marginBottom: 10 }, liveText: { color: '#17843f', fontSize: 12 }, refreshButton: { color: '#17843f', fontSize: 12, fontWeight: '700' },
   mapFrame: { height: 260, borderRadius: 16, overflow: 'hidden', backgroundColor: '#e8eee9', borderWidth: 1, borderColor: '#dce4df', marginBottom: 24 }, map: { flex: 1, backgroundColor: '#e8eee9' },
   mapState: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#e8eee9' }, mapStateText: { color: '#52665a', fontSize: 13, textAlign: 'center', paddingHorizontal: 20 },
+  mapRetry: { marginTop: 4, borderWidth: 1, borderColor: '#17843f', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 }, mapRetryText: { color: '#17843f', fontSize: 12, fontWeight: '700' },
   sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }, sectionTitle: { fontSize: 20, fontWeight: '800', color: '#111827' }, refreshNote: { fontSize: 11, color: '#8a9390' },
   truckCard: { backgroundColor: '#fff', padding: 16, borderRadius: 16, borderWidth: 1, borderColor: '#e5e9e7', marginBottom: 13 }, truckHeader: { flexDirection: 'row', alignItems: 'center' }, truckIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#17843f', alignItems: 'center', justifyContent: 'center' },
   truckHeading: { flex: 1, marginLeft: 10 }, truckCode: { fontSize: 16, fontWeight: '800', color: '#111827' }, driver: { fontSize: 12, color: '#667085', marginTop: 2 }, badge: { borderRadius: 16, paddingHorizontal: 9, paddingVertical: 5 }, badgeText: { fontSize: 11, fontWeight: '700' },

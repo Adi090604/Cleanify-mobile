@@ -1,5 +1,7 @@
-import { useRouter } from 'expo-router';
+import { useCallback } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
 import {
+  BackHandler,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -9,6 +11,17 @@ import {
 export default function SignupScreen() {
   const router = useRouter();
 
+  useFocusEffect(
+    useCallback(() => {
+      const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+        router.replace('/login');
+        return true;
+      });
+
+      return () => subscription.remove();
+    }, [router])
+  );
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Create account</Text>
@@ -17,7 +30,7 @@ export default function SignupScreen() {
         Cleanify sign-up screen will go here.
       </Text>
 
-      <TouchableOpacity onPress={() => router.back()}>
+      <TouchableOpacity onPress={() => router.replace('/login')}>
         <Text style={styles.back}>Back</Text>
       </TouchableOpacity>
     </View>

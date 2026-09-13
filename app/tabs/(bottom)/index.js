@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import {
   ActivityIndicator,
@@ -12,7 +12,7 @@ import {
   View,
 } from 'react-native';
 
-import { api, clearAuthToken } from '../../src/api/client';
+import { api, clearAuthToken } from '../../../src/api/client';
 
 const STATUS_STYLES = {
   pending: { backgroundColor: '#fff4d6', color: '#c47a00' },
@@ -76,6 +76,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const [user, setUser] = useState(null);
   const [reports, setReports] = useState([]);
+  const [nextCollection, setNextCollection] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
@@ -86,13 +87,15 @@ export default function HomeScreen() {
     setError(null);
 
     try {
-      const [userResponse, reportsResponse] = await Promise.all([
+      const [userResponse, reportsResponse, scheduleResponse] = await Promise.all([
         api.get('/me'),
         api.get('/reports'),
+        api.get('/schedules/next'),
       ]);
 
       setUser(userResponse.data.user);
       setReports(reportsResponse.data.data ?? []);
+      setNextCollection(scheduleResponse.data.next_collection ?? null);
     } catch (requestError) {
       if (requestError.response?.status === 401) {
         await clearAuthToken();
@@ -107,9 +110,11 @@ export default function HomeScreen() {
     }
   }, [router]);
 
-  useEffect(() => {
-    loadHome();
-  }, [loadHome]);
+  useFocusEffect(
+    useCallback(() => {
+      loadHome();
+    }, [loadHome])
+  );
 
   if (loading) {
     return (
@@ -140,10 +145,19 @@ export default function HomeScreen() {
         </View>
 
         <Text style={styles.sectionLabel}>YOUR ZONE THIS WEEK</Text>
-        <View style={styles.collectionCard}>
-          <Text style={styles.zoneTitle}>Zone 31 - Barangay Mabua</Text>
-          <Text style={styles.collectionDate}>Sunday · 8:00 AM</Text>
-        </View>
+        {nextCollection ? (
+          <View style={styles.collectionCard}>
+            <Text style={styles.zoneTitle}>{nextCollection.area}</Text>
+            <Text style={styles.collectionDate}>
+              {nextCollection.date_display} · {nextCollection.time_range}
+            </Text>
+            <Text style={styles.collectionTruck}>{nextCollection.truck}</Text>
+          </View>
+        ) : (
+          <View style={styles.collectionCard}>
+            <Text style={styles.emptyCollection}>No upcoming collection scheduled.</Text>
+          </View>
+        )}
 
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Community Reports</Text>
@@ -183,6 +197,8 @@ const styles = StyleSheet.create({
   collectionCard: { backgroundColor: '#ffffff', borderRadius: 18, padding: 18, borderWidth: 1, borderColor: '#e4e9e6', marginBottom: 30 },
   zoneTitle: { fontSize: 19, fontWeight: '800', color: '#111827' },
   collectionDate: { marginTop: 7, fontSize: 14, color: '#667085' },
+  collectionTruck: { marginTop: 7, fontSize: 13, fontWeight: '600', color: '#374151' },
+  emptyCollection: { fontSize: 14, color: '#667085' },
   sectionHeader: { marginBottom: 15 },
   sectionTitle: { fontSize: 20, fontWeight: '800', color: '#111827' },
   reportCard: { backgroundColor: '#ffffff', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: '#e5e9e7', marginBottom: 14 },

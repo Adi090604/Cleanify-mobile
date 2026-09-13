@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { api, clearAuthToken } from '../../src/api/client';
+import { logout } from '../../../src/api/client';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -13,12 +13,8 @@ export default function ProfileScreen() {
 
     setLoggingOut(true);
 
-    try {
-      await api.post('/auth/logout');
-    } finally {
-      await clearAuthToken();
-      router.replace('/login');
-    }
+    await logout();
+    router.replace('/login');
   };
 
   return (

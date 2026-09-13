@@ -1,11 +1,12 @@
-import { useState } from 'react';
-import { useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
 import {
   Alert,
+  BackHandler,
   StyleSheet,
   Text,
   TextInput,
@@ -19,6 +20,17 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+        router.replace('/');
+        return true;
+      });
+
+      return () => subscription.remove();
+    }, [router])
+  );
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -76,7 +88,7 @@ export default function LoginScreen() {
 
       <TouchableOpacity
         style={styles.backButton}
-        onPress={() => router.back()}
+        onPress={() => router.replace('/')}
         activeOpacity={0.7}
       >
         <Text style={styles.backIcon}>‹</Text>

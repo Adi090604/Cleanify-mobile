@@ -26,3 +26,11 @@ export function clearAuthToken() {
 export function getAuthToken() {
   return SecureStore.getItemAsync(AUTH_TOKEN_KEY);
 }
+
+export async function logout() {
+  try {
+    await api.post('/auth/logout');
+  } finally {
+    await clearAuthToken();
+  }
+}

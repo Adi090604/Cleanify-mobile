@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter } from 'expo-router';
 import { Drawer, DrawerContentScrollView, DrawerItem, useDrawerStatus } from 'expo-router/drawer';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
-import { ActivityIndicator, Image, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, AppState, Image, StyleSheet, Text, View } from 'react-native';
 
 import { api, clearAuthToken, logout } from '../../src/api/client';
+import { NotificationBadgeContext, useNotificationBadge } from '../../src/notifications/NotificationBadgeContext';
 
 const ITEMS = [
   { label: 'Home', icon: 'home', href: '/tabs' },
@@ -23,6 +24,7 @@ function CleanifyDrawerContent(props) {
   const [user, setUser] = useState(null);
   const [loggingOut, setLoggingOut] = useState(false);
   const [photoFailed, setPhotoFailed] = useState(false);
+  const { unreadCount } = useNotificationBadge();
 
   useEffect(() => {
     let active = true;
@@ -77,7 +79,12 @@ function CleanifyDrawerContent(props) {
         {ITEMS.map((item) => (
           <DrawerItem
             key={item.href}
-            label={item.label}
+            label={item.label === 'Notifications' ? ({ color }) => (
+              <View style={styles.drawerLabelRow}>
+                <Text style={[styles.itemLabel, { color }]}>{item.label}</Text>
+                {unreadCount > 0 ? <View style={styles.notificationBadge}><Text style={styles.notificationBadgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text></View> : null}
+              </View>
+            ) : item.label}
             focused={pathname === item.href || (item.href === '/tabs' && pathname === '/tabs/')}
             icon={({ color }) => <View style={styles.itemIcon}><FontAwesome5 name={item.icon} color={color} size={16} /></View>}
             onPress={() => goTo(item.href)}
@@ -105,7 +112,28 @@ function CleanifyDrawerContent(props) {
 }
 
 export default function AuthenticatedDrawerLayout() {
+  const [unreadCount, setUnreadCount] = useState(0);
+  const refreshUnreadCount = useCallback(async () => {
+    try {
+      const { data } = await api.get('/notifications', { params: { page: 1 } });
+      setUnreadCount(Number(data.unread_count) || 0);
+    } catch {
+      // Notification request errors are surfaced by the Notifications screen.
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshUnreadCount();
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') refreshUnreadCount();
+    });
+    return () => subscription.remove();
+  }, [refreshUnreadCount]);
+
+  const badge = useMemo(() => ({ unreadCount, setUnreadCount, refreshUnreadCount }), [refreshUnreadCount, unreadCount]);
+
   return (
+    <NotificationBadgeContext.Provider value={badge}>
     <Drawer
       drawerContent={(props) => <CleanifyDrawerContent {...props} />}
       screenOptions={{
@@ -130,14 +158,8 @@ export default function AuthenticatedDrawerLayout() {
           drawerItemStyle: { display: 'none' },
         }}
       />
-      <Drawer.Screen
-        name="notifications"
-        options={{
-          title: 'Notifications',
-          drawerItemStyle: { display: 'none' },
-        }}
-      />
     </Drawer>
+    </NotificationBadgeContext.Provider>
   );
 }
 
@@ -154,4 +176,7 @@ const styles = StyleSheet.create({
   itemIcon: { width: 22, alignItems: 'center' },
   drawerFooter: { borderTopWidth: 1, borderTopColor: '#e5e9e7', paddingTop: 7, paddingBottom: 11, paddingHorizontal: 9 },
   itemLabel: { fontSize: 13, fontWeight: '600', marginLeft: -3 },
+  drawerLabelRow: { width: 188, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  notificationBadge: { minWidth: 18, height: 18, paddingHorizontal: 5, borderRadius: 9, backgroundColor: '#dc2626', alignItems: 'center', justifyContent: 'center' },
+  notificationBadgeText: { color: '#fff', fontSize: 9, lineHeight: 11, fontWeight: '800' },
 });

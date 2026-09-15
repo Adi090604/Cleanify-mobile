@@ -13,7 +13,7 @@ import {
 
 import { api, clearAuthToken } from '../../../src/api/client';
 
-function PickupCard({ pickup, isNext }) {
+function PickupCard({ pickup }) {
   const date = new Date(pickup.collection_at);
 
   return (
@@ -28,11 +28,6 @@ function PickupCard({ pickup, isNext }) {
         <Text style={styles.pickupDetail}>{pickup.time_range}</Text>
         <Text style={styles.pickupTruck}>{pickup.truck}</Text>
       </View>
-      {isNext ? (
-        <View style={styles.nextBadge}>
-          <Text style={styles.nextBadgeText}>Next</Text>
-        </View>
-      ) : null}
     </View>
   );
 }
@@ -81,7 +76,10 @@ export default function ScheduleScreen() {
   }
 
   const nextCollection = scheduleData?.upcoming_pickups?.[0] ?? null;
-  const upcomingPickups = scheduleData?.upcoming_pickups ?? [];
+  const upcomingPickups = (scheduleData?.upcoming_pickups ?? []).filter((pickup) => (
+    pickup.schedule_id !== nextCollection?.schedule_id
+    || pickup.collection_at !== nextCollection?.collection_at
+  ));
 
   return (
     <View style={styles.container}>
@@ -142,16 +140,20 @@ export default function ScheduleScreen() {
               </View>
             )}
 
-            <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>Upcoming Pickups</Text></View>
-            {upcomingPickups.length ? (
-              <View style={styles.upcomingList}>
-                {upcomingPickups.map((pickup, index) => (
-                  <PickupCard key={`${pickup.schedule_id}-${pickup.collection_at}`} pickup={pickup} isNext={index === 0} />
-                ))}
-              </View>
-            ) : (
-              <View style={styles.stateCard}><Text style={styles.stateText}>No upcoming pickups for your service area.</Text></View>
-            )}
+            {nextCollection ? (
+              <>
+                <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>Upcoming Pickups</Text></View>
+                {upcomingPickups.length ? (
+                  <View style={styles.upcomingList}>
+                    {upcomingPickups.map((pickup) => (
+                      <PickupCard key={`${pickup.schedule_id}-${pickup.collection_at}`} pickup={pickup} />
+                    ))}
+                  </View>
+                ) : (
+                  <View style={styles.stateCard}><Text style={styles.stateText}>No additional pickups scheduled.</Text></View>
+                )}
+              </>
+            ) : null}
           </>
         )}
 
@@ -169,11 +171,11 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: '800', color: '#111827' },
   subtitle: { marginTop: 7, fontSize: 14, lineHeight: 20, color: '#667085' },
   sectionLabel: { fontSize: 12, fontWeight: '700', color: '#7b8580', letterSpacing: 0.7, marginBottom: 10 },
-  areaCard: { backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e4e9e6', borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', marginBottom: 28 },
-  areaIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: '#ecf8ef', justifyContent: 'center', alignItems: 'center' },
-  areaIconText: { fontSize: 23, color: '#17843f', fontWeight: '700' },
-  areaInfo: { flex: 1, marginLeft: 12 },
-  areaName: { fontSize: 15, fontWeight: '700', color: '#111827' },
+  areaCard: { backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e4e9e6', borderRadius: 12, paddingHorizontal: 13, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', marginBottom: 24 },
+  areaIcon: { width: 34, height: 34, borderRadius: 10, backgroundColor: '#ecf8ef', justifyContent: 'center', alignItems: 'center' },
+  areaIconText: { fontSize: 18, color: '#17843f', fontWeight: '700' },
+  areaInfo: { flex: 1, marginLeft: 10 },
+  areaName: { fontSize: 14, fontWeight: '700', color: '#111827' },
   nextCollectionCard: { backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#dfe6e2', borderRadius: 18, padding: 18, marginBottom: 30 },
   nextCollectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   nextCollectionText: { flex: 1, paddingRight: 12 },
@@ -199,8 +201,6 @@ const styles = StyleSheet.create({
   pickupArea: { fontSize: 14, fontWeight: '700', color: '#111827' },
   pickupDetail: { marginTop: 5, fontSize: 13, color: '#667085' },
   pickupTruck: { marginTop: 3, fontSize: 12, color: '#8a9390' },
-  nextBadge: { backgroundColor: '#17843f', borderRadius: 20, paddingHorizontal: 9, paddingVertical: 5 },
-  nextBadgeText: { color: '#ffffff', fontSize: 10, fontWeight: '700' },
   stateCard: { backgroundColor: '#ffffff', borderRadius: 16, borderWidth: 1, borderColor: '#e4e9e6', padding: 20, marginBottom: 28, alignItems: 'center' },
   stateTitle: { color: '#374151', fontSize: 15, fontWeight: '700', textAlign: 'center' },
   stateText: { color: '#667085', fontSize: 14, textAlign: 'center' },

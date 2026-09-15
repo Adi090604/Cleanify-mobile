@@ -3,12 +3,14 @@ import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { ActivityIndicator, Alert, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { api, clearAuthToken } from '../../src/api/client';
+import { api, clearAuthToken } from '../../../src/api/client';
+import { useNotificationBadge } from '../../../src/notifications/NotificationBadgeContext';
 
 const ICONS = { schedule: 'calendar-alt', tracker: 'truck', reports: 'comments', community: 'users', system: 'bell' };
 
 export default function NotificationsScreen() {
   const router = useRouter();
+  const { setUnreadCount: setBadgeUnreadCount } = useNotificationBadge();
   const [notifications, setNotifications] = useState([]);
   const [categories, setCategories] = useState([]);
   const [filter, setFilter] = useState('all');
@@ -31,6 +33,7 @@ export default function NotificationsScreen() {
       setNotifications((current) => nextPage === 1 ? data.notifications : [...current, ...data.notifications]);
       setCategories(data.categories ?? []);
       setUnreadCount(data.unread_count ?? 0);
+      setBadgeUnreadCount(data.unread_count ?? 0);
       setPage(data.meta?.current_page ?? nextPage);
       setLastPage(data.meta?.last_page ?? nextPage);
     } catch (requestError) {
@@ -43,12 +46,16 @@ export default function NotificationsScreen() {
       setRefreshing(false);
       setLoadingMore(false);
     }
-  }, [category, filter, router]);
+  }, [category, filter, router, setBadgeUnreadCount]);
 
   useFocusEffect(useCallback(() => { loadNotifications(); }, [loadNotifications]));
 
   const openNotification = async (notification) => {
-    if (!notification.is_read) await api.post('/notifications/' + notification.id + '/read');
+    if (!notification.is_read) {
+      await api.post('/notifications/' + notification.id + '/read');
+      setUnreadCount((count) => Math.max(0, count - 1));
+      setBadgeUnreadCount((count) => Math.max(0, count - 1));
+    }
     if (notification.action_route) router.navigate(notification.action_route);
     else await loadNotifications({ refresh: true });
   };

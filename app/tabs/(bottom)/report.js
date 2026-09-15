@@ -1,7 +1,8 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import * as ImagePicker from 'expo-image-picker';
+import * as Location from 'expo-location';
 import { WebView } from 'react-native-webview';
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
@@ -37,7 +38,20 @@ const LEAFLET_MAP_HTML = `<!DOCTYPE html>
         }));
       }
 
-      function setLocation(lat, lng) {
+      function isValidLocation(lat, lng) {
+        return Number.isFinite(lat)
+          && Number.isFinite(lng)
+          && lat >= -90
+          && lat <= 90
+          && lng >= -180
+          && lng <= 180;
+      }
+
+      function setLocation(lat, lng, centerMap) {
+        lat = Number(lat);
+        lng = Number(lng);
+        if (!isValidLocation(lat, lng)) return;
+
         if (marker) marker.setLatLng([lat, lng]);
         else {
           marker = L.marker([lat, lng], { draggable: true }).addTo(map);
@@ -46,11 +60,16 @@ const LEAFLET_MAP_HTML = `<!DOCTYPE html>
             sendLocation(point.lat, point.lng);
           });
         }
+        if (centerMap) map.setView([lat, lng], map.getZoom(), { animate: true });
         sendLocation(lat, lng);
       }
 
+      window.setReportLocation = function (lat, lng) {
+        setLocation(lat, lng, true);
+      };
+
       map.on('click', function (event) {
-        setLocation(event.latlng.lat, event.latlng.lng);
+        setLocation(event.latlng.lat, event.latlng.lng, false);
       });
       map.whenReady(function () {
         window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'map_ready' }));
@@ -68,6 +87,15 @@ const STATUS_STYLES = {
 function errorMessage(error) {
   const errors = error.response?.data?.errors;
   return (errors && Object.values(errors).flat()[0]) || error.response?.data?.message || 'Unable to complete the request. Please try again.';
+}
+
+function isValidCoordinate(latitude, longitude) {
+  return Number.isFinite(latitude)
+    && Number.isFinite(longitude)
+    && latitude >= -90
+    && latitude <= 90
+    && longitude >= -180
+    && longitude <= 180;
 }
 
 function ReportCard({ report }) {
@@ -97,8 +125,10 @@ function ReportCard({ report }) {
 
 export default function ReportScreen() {
   const router = useRouter();
+  const mapRef = useRef(null);
   const [location, setLocation] = useState('');
   const [coordinate, setCoordinate] = useState(null);
+  const [gettingLocation, setGettingLocation] = useState(false);
   const [mapKey, setMapKey] = useState(0);
   const [mapLoading, setMapLoading] = useState(true);
   const [mapError, setMapError] = useState(false);
@@ -175,6 +205,51 @@ export default function ReportScreen() {
     }
   };
 
+  const useMyLocation = async () => {
+    if (gettingLocation) return;
+
+    try {
+      setGettingLocation(true);
+
+      const permission = await Location.requestForegroundPermissionsAsync();
+
+      if (permission.status !== 'granted') {
+        Alert.alert(
+          'Location permission needed',
+          permission.canAskAgain
+            ? 'Allow location access to place the report marker at your current position.'
+            : 'Location access is disabled. You can enable it for Cleanify in your device settings.'
+        );
+        return;
+      }
+
+      const currentLocation = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+      const latitude = Number(currentLocation.coords?.latitude);
+      const longitude = Number(currentLocation.coords?.longitude);
+
+      if (!isValidCoordinate(latitude, longitude)) {
+        throw new Error('The device returned invalid coordinates.');
+      }
+
+      setCoordinate({ latitude, longitude });
+      mapRef.current?.injectJavaScript(`
+        if (typeof window.setReportLocation === 'function') {
+          window.setReportLocation(${latitude}, ${longitude});
+        }
+        true;
+      `);
+    } catch {
+      Alert.alert(
+        'Unable to get location',
+        'Make sure location services are enabled, then try again. Your previously selected location was not changed.'
+      );
+    } finally {
+      setGettingLocation(false);
+    }
+  };
+
   const handleMapMessage = (event) => {
     try {
       const message = JSON.parse(event.nativeEvent.data);
@@ -185,8 +260,7 @@ export default function ReportScreen() {
       if (message.type !== 'location') return;
       const latitude = Number(message.latitude);
       const longitude = Number(message.longitude);
-      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
-      if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) return;
+      if (!isValidCoordinate(latitude, longitude)) return;
       setCoordinate({ latitude, longitude });
     } catch {
       // Ignore messages that do not match the map bridge payload.
@@ -201,8 +275,24 @@ export default function ReportScreen() {
           <Text style={styles.sectionTitle}>Create Report</Text>
           <Text style={styles.label}>Report Location</Text>
           <Text style={styles.help}>Tap or drag the marker to select the issue location.</Text>
+          <TouchableOpacity
+            style={[styles.locationButton, (gettingLocation || mapLoading || mapError) && styles.disabled]}
+            onPress={useMyLocation}
+            disabled={gettingLocation || mapLoading || mapError}
+            activeOpacity={0.75}
+          >
+            {gettingLocation ? (
+              <ActivityIndicator color="#17843f" size="small" />
+            ) : (
+              <FontAwesome5 name="crosshairs" color="#17843f" size={15} />
+            )}
+            <Text style={styles.locationButtonText}>
+              {gettingLocation ? 'Getting location...' : 'Use My Location'}
+            </Text>
+          </TouchableOpacity>
           <View style={styles.mapFrame}>
             <WebView
+              ref={mapRef}
               key={mapKey}
               style={styles.map}
               source={{ html: LEAFLET_MAP_HTML, baseUrl: 'https://localhost/' }}
@@ -246,6 +336,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f6f8f7' }, content: { paddingHorizontal: 18, paddingTop: 24, paddingBottom: 100 },
   title: { fontSize: 28, fontWeight: '800', color: '#111827', marginBottom: 16 }, formCard: { backgroundColor: '#fff', padding: 16, borderRadius: 16, borderWidth: 1, borderColor: '#e5e9e7', marginBottom: 28 },
   sectionTitle: { fontSize: 20, fontWeight: '800', color: '#17843f', marginBottom: 18 }, label: { fontSize: 14, fontWeight: '700', color: '#374151', marginBottom: 7 }, help: { fontSize: 12, color: '#6b7280', marginBottom: 9 },
+  locationButton: { minHeight: 38, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: '#b9ddc4', borderRadius: 10, backgroundColor: '#f2faf4', paddingHorizontal: 12, paddingVertical: 8, marginBottom: 10 }, locationButtonText: { color: '#17843f', fontSize: 13, fontWeight: '700' },
   mapFrame: { width: '100%', height: 230, borderRadius: 12, overflow: 'hidden', backgroundColor: '#e8eee9', marginBottom: 8 }, map: { flex: 1, backgroundColor: '#e8eee9' }, mapState: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#e8eee9' }, mapStateText: { color: '#52665a', fontSize: 12 }, coordinates: { color: '#667085', fontSize: 12, marginBottom: 16 }, input: { minHeight: 48, borderWidth: 1, borderColor: '#d1d5db', borderRadius: 10, paddingHorizontal: 12, fontSize: 15, color: '#111827', marginBottom: 16 }, textarea: { height: 120, paddingTop: 12 },
   preview: { width: '100%', height: 200, borderRadius: 12, marginBottom: 12 }, photoButton: { minHeight: 48, borderWidth: 1, borderColor: '#17843f', borderRadius: 10, flexDirection: 'row', gap: 9, alignItems: 'center', justifyContent: 'center' }, photoButtonText: { color: '#17843f', fontWeight: '700' }, submitButton: { minHeight: 50, borderRadius: 10, backgroundColor: '#17843f', alignItems: 'center', justifyContent: 'center', marginTop: 12 }, submitText: { color: '#fff', fontWeight: '800', fontSize: 15 }, disabled: { opacity: 0.6 },
   feedTitle: { fontSize: 21, fontWeight: '800', color: '#111827', marginBottom: 14 }, reportCard: { backgroundColor: '#fff', padding: 16, borderRadius: 16, borderWidth: 1, borderColor: '#e5e9e7', marginBottom: 14 }, reportHeader: { flexDirection: 'row', alignItems: 'center' }, avatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#17843f', alignItems: 'center', justifyContent: 'center' }, avatarText: { color: '#fff', fontSize: 16, fontWeight: '800' }, authorInfo: { flex: 1, marginLeft: 10 }, author: { fontSize: 15, fontWeight: '700', color: '#111827' }, date: { fontSize: 11, color: '#8a9390', marginTop: 3 }, badge: { paddingHorizontal: 9, paddingVertical: 5, borderRadius: 16 }, badgeText: { fontSize: 11, fontWeight: '700', textTransform: 'capitalize' }, description: { fontSize: 14, lineHeight: 21, color: '#374151', marginTop: 14 }, location: { fontSize: 13, color: '#667085', marginTop: 9 }, reportImage: { width: '100%', height: 210, borderRadius: 12, marginTop: 12 }, counts: { flexDirection: 'row', gap: 22, marginTop: 13 }, count: { color: '#667085', fontSize: 14 }, stateCard: { padding: 20, backgroundColor: '#fff', borderRadius: 14, alignItems: 'center', marginBottom: 14 }, stateText: { color: '#667085', textAlign: 'center' }, moreButton: { minHeight: 46, alignItems: 'center', justifyContent: 'center' }, moreText: { color: '#17843f', fontWeight: '700' },

@@ -18,7 +18,6 @@ export default function LandingScreen() {
       const token = await getAuthToken();
 
       if (!token) {
-        setCheckingSession(false);
         return;
       }
 
@@ -28,11 +27,10 @@ export default function LandingScreen() {
       if (error.response?.status === 401) {
         await clearAuthToken();
         router.replace('/login');
-        return;
       } else {
-        setSessionError('Unable to restore your saved session. You can sign in again.');
+        setSessionError('Unable to connect to the Cleanify server. Check your network connection and try again.');
       }
-
+    } finally {
       setCheckingSession(false);
     }
   }, [router]);

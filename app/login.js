@@ -1,8 +1,9 @@
 import { useCallback, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
+
+import { api, AUTH_TOKEN_KEY, isApiConnectionError } from '../src/api/client';
 
 import {
   Alert,
@@ -44,19 +45,10 @@ export default function LoginScreen() {
     try {
       setLoading(true);
 
-      const response = await axios.post(
-        'http://192.168.1.5:8000/api/v1/auth/login',
-        {
-          email,
-          password,
-        },
-        {
-          headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      const response = await api.post('/auth/login', {
+        email,
+        password,
+      });
 
       const token = response.data.token;
 
@@ -68,13 +60,13 @@ export default function LoginScreen() {
         return;
       }
 
-      await SecureStore.setItemAsync('auth_token', token);
+      await SecureStore.setItemAsync(AUTH_TOKEN_KEY, token);
 
       router.replace('/tabs');
     } catch (error) {
-      const message =
-        error.response?.data?.message ||
-        'Unable to sign in. Please check your credentials and connection.';
+      const message = error.response?.data?.message || (isApiConnectionError(error)
+        ? 'Unable to connect to the Cleanify server. Check your network connection and try again.'
+        : 'Unable to sign in. Please try again.');
 
       Alert.alert('Login failed', message);
     } finally {

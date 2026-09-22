@@ -86,7 +86,7 @@ function CleanifyDrawerContent(props) {
               </View>
             ) : item.label}
             focused={pathname === item.href || (item.href === '/tabs' && pathname === '/tabs/')}
-            icon={({ color }) => <View style={styles.itemIcon}><FontAwesome5 name={item.icon} color={color} size={16} /></View>}
+            icon={({ color }) => <View style={styles.itemIcon}><FontAwesome5 name={item.icon} color={color} size={15} /></View>}
             onPress={() => goTo(item.href)}
             activeTintColor="#17843f"
             activeBackgroundColor="#ecf8ef"
@@ -100,11 +100,11 @@ function CleanifyDrawerContent(props) {
       <View style={styles.drawerFooter}>
         <DrawerItem
           label={loggingOut ? 'Signing out...' : 'Logout'}
-          icon={() => <View style={styles.itemIcon}><FontAwesome5 name="sign-out-alt" color="#b91c1c" size={16} /></View>}
+          icon={() => <View style={styles.itemIcon}><FontAwesome5 name="sign-out-alt" color="#b91c1c" size={15} /></View>}
           onPress={signOut}
           inactiveTintColor="#b91c1c"
           labelStyle={styles.itemLabel}
-          style={styles.drawerItem}
+          style={[styles.drawerItem, styles.logoutItem]}
         />
       </View>
     </DrawerContentScrollView>
@@ -138,9 +138,10 @@ export default function AuthenticatedDrawerLayout() {
       drawerContent={(props) => <CleanifyDrawerContent {...props} />}
       screenOptions={{
         drawerPosition: 'left',
-        drawerStyle: { width: 300 },
+        drawerStyle: { width: 286, backgroundColor: '#fbfcfb' },
         headerTintColor: '#17843f',
-        headerTitleStyle: { fontWeight: '800' },
+        headerStyle: { backgroundColor: '#ffffff' },
+        headerTitleStyle: { fontSize: 18, fontWeight: '700', color: '#18211c' },
         headerShadowVisible: false,
       }}
     >
@@ -165,18 +166,19 @@ export default function AuthenticatedDrawerLayout() {
 
 const styles = StyleSheet.create({
   drawerContent: { flex: 1, paddingTop: 0, backgroundColor: '#fbfcfb' },
-  drawerHeader: { minHeight: 205, backgroundColor: '#fbfcfb', paddingHorizontal: 22, paddingTop: 34, paddingBottom: 22, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 1, borderBottomColor: '#e8ece9' },
-  avatar: { width: 78, height: 78, borderRadius: 39, backgroundColor: '#e4f4e8', borderWidth: 3, borderColor: '#fff', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
-  drawerPhoto: { width: 78, height: 78, borderRadius: 39, backgroundColor: '#e4f4e8', borderWidth: 3, borderColor: '#fff', marginBottom: 12 },
-  avatarText: { color: '#17843f', fontSize: 29, fontWeight: '800' },
-  userName: { color: '#18211c', fontSize: 18, fontWeight: '800', textAlign: 'center' },
-  userEmail: { marginTop: 4, color: '#78817c', fontSize: 12, textAlign: 'center' },
-  drawerItems: { flex: 1, paddingTop: 10, paddingHorizontal: 9 },
-  drawerItem: { minHeight: 43, borderRadius: 10, marginVertical: 1 },
-  itemIcon: { width: 22, alignItems: 'center' },
-  drawerFooter: { borderTopWidth: 1, borderTopColor: '#e5e9e7', paddingTop: 7, paddingBottom: 11, paddingHorizontal: 9 },
-  itemLabel: { fontSize: 13, fontWeight: '600', marginLeft: -3 },
-  drawerLabelRow: { width: 188, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  notificationBadge: { minWidth: 18, height: 18, paddingHorizontal: 5, borderRadius: 9, backgroundColor: '#dc2626', alignItems: 'center', justifyContent: 'center' },
-  notificationBadgeText: { color: '#fff', fontSize: 9, lineHeight: 11, fontWeight: '800' },
+  drawerHeader: { minHeight: 174, backgroundColor: '#fbfcfb', paddingHorizontal: 20, paddingTop: 25, paddingBottom: 18, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 1, borderBottomColor: '#edf0ee' },
+  avatar: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#e4f4e8', borderWidth: 2, borderColor: '#fff', alignItems: 'center', justifyContent: 'center', marginBottom: 9 },
+  drawerPhoto: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#e4f4e8', borderWidth: 2, borderColor: '#fff', marginBottom: 9 },
+  avatarText: { color: '#17843f', fontSize: 24, fontWeight: '800' },
+  userName: { color: '#18211c', fontSize: 16, fontWeight: '700', textAlign: 'center' },
+  userEmail: { marginTop: 3, color: '#7b8580', fontSize: 11, textAlign: 'center' },
+  drawerItems: { flex: 1, paddingTop: 8, paddingHorizontal: 8 },
+  drawerItem: { minHeight: 40, borderRadius: 10, marginVertical: 1 },
+  logoutItem: { backgroundColor: '#fff5f5' },
+  itemIcon: { width: 20, alignItems: 'center' },
+  drawerFooter: { borderTopWidth: 1, borderTopColor: '#edf0ee', paddingTop: 7, paddingBottom: 9, paddingHorizontal: 8 },
+  itemLabel: { fontSize: 12.5, fontWeight: '600', marginLeft: -4 },
+  drawerLabelRow: { width: 176, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  notificationBadge: { minWidth: 16, height: 16, paddingHorizontal: 4, borderRadius: 8, backgroundColor: '#dc2626', alignItems: 'center', justifyContent: 'center' },
+  notificationBadgeText: { color: '#fff', fontSize: 8, lineHeight: 10, fontWeight: '800' },
 });

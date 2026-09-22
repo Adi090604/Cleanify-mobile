@@ -1,11 +1,13 @@
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
-export const API_BASE_URL = 'http://192.168.1.5:8000/api/v1';
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
 export const AUTH_TOKEN_KEY = 'auth_token';
+export const API_TIMEOUT_MS = 15_000;
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
+  timeout: API_TIMEOUT_MS,
   headers: { Accept: 'application/json' },
 });
 
@@ -25,6 +27,10 @@ export function clearAuthToken() {
 
 export function getAuthToken() {
   return SecureStore.getItemAsync(AUTH_TOKEN_KEY);
+}
+
+export function isApiConnectionError(error) {
+  return axios.isAxiosError(error) && !error.response;
 }
 
 export async function logout() {

@@ -7,6 +7,7 @@ import { WebView } from 'react-native-webview';
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { api, clearAuthToken } from '../../../src/api/client';
+import ReportInteractions from '../../../src/components/ReportInteractions';
 
 const LEAFLET_MAP_HTML = `<!DOCTYPE html>
 <html>
@@ -98,7 +99,7 @@ function isValidCoordinate(latitude, longitude) {
     && longitude <= 180;
 }
 
-function ReportCard({ report }) {
+function ReportCard({ report, onReportUpdate }) {
   const badge = STATUS_STYLES[report.status] ?? STATUS_STYLES.pending;
   return (
     <View style={styles.reportCard}>
@@ -115,10 +116,7 @@ function ReportCard({ report }) {
       <Text style={styles.description}>{report.description}</Text>
       {report.location ? <Text style={styles.location}><FontAwesome5 name="map-marker-alt" /> {report.location}</Text> : null}
       {report.image_url ? <Image source={{ uri: report.image_url }} style={styles.reportImage} resizeMode="cover" /> : null}
-      <View style={styles.counts}>
-        <Text style={styles.count}><FontAwesome5 name="heart" solid={report.is_liked} /> {report.likes_count}</Text>
-        <Text style={styles.count}><FontAwesome5 name="comment" /> {report.comments_count}</Text>
-      </View>
+      <ReportInteractions report={report} onReportUpdate={onReportUpdate} />
     </View>
   );
 }
@@ -142,6 +140,10 @@ export default function ReportScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+
+  const updateReport = useCallback((reportId, changes) => {
+    setReports((current) => current.map((report) => report.id === reportId ? { ...report, ...changes } : report));
+  }, []);
 
   const loadReports = useCallback(async ({ refresh = false, nextPage = 1 } = {}) => {
     if (refresh) setRefreshing(true);
@@ -325,7 +327,7 @@ export default function ReportScreen() {
         {loading ? <ActivityIndicator color="#17843f" size="large" /> : null}
         {error ? <View style={styles.stateCard}><Text style={styles.stateText}>{error}</Text></View> : null}
         {!loading && !error && reports.length === 0 ? <View style={styles.stateCard}><Text style={styles.stateText}>No reports yet.</Text></View> : null}
-        {reports.map((report) => <ReportCard key={report.id} report={report} />)}
+        {reports.map((report) => <ReportCard key={report.id} report={report} onReportUpdate={updateReport} />)}
         {page < lastPage ? <TouchableOpacity style={styles.moreButton} onPress={() => loadReports({ nextPage: page + 1 })} disabled={loadingMore}><Text style={styles.moreText}>{loadingMore ? 'Loading...' : 'Load More'}</Text></TouchableOpacity> : null}
       </ScrollView>
     </KeyboardAvoidingView>

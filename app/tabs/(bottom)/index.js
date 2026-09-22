@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 
 import { api, clearAuthToken } from '../../../src/api/client';
+import ReportInteractions from '../../../src/components/ReportInteractions';
 
 const STATUS_STYLES = {
   pending: { backgroundColor: '#fff4d6', color: '#c47a00' },
@@ -32,7 +33,7 @@ function reportTime(value) {
   return created.toLocaleDateString();
 }
 
-function ReportCard({ report }) {
+function ReportCard({ report, onReportUpdate }) {
   const badge = STATUS_STYLES[report.status] ?? STATUS_STYLES.pending;
 
   return (
@@ -62,12 +63,7 @@ function ReportCard({ report }) {
           accessibilityLabel="Community report photo"
         />
       ) : null}
-      <View style={styles.reportCounts}>
-        <Text style={[styles.countText, report.is_liked && styles.likedText]}>
-          {report.is_liked ? '♥' : '♡'} {report.likes_count}
-        </Text>
-        <Text style={styles.countText}>◯ {report.comments_count}</Text>
-      </View>
+      <ReportInteractions report={report} onReportUpdate={onReportUpdate} />
     </View>
   );
 }
@@ -80,6 +76,10 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+
+  const updateReport = useCallback((reportId, changes) => {
+    setReports((current) => current.map((report) => report.id === reportId ? { ...report, ...changes } : report));
+  }, []);
 
   const loadHome = useCallback(async ({ refresh = false } = {}) => {
     if (refresh) setRefreshing(true);
@@ -179,7 +179,7 @@ export default function HomeScreen() {
           </View>
         ) : null}
 
-        {reports.map((report) => <ReportCard key={report.id} report={report} />)}
+        {reports.map((report) => <ReportCard key={report.id} report={report} onReportUpdate={updateReport} />)}
         <View style={styles.bottomSpace} />
       </ScrollView>
     </View>
@@ -213,9 +213,6 @@ const styles = StyleSheet.create({
   reportDescription: { marginTop: 16, fontSize: 14, lineHeight: 21, color: '#374151' },
   location: { marginTop: 10, fontSize: 13, color: '#667085' },
   reportImage: { width: '100%', height: 210, borderRadius: 14, marginTop: 14, backgroundColor: '#edf1ef' },
-  reportCounts: { flexDirection: 'row', gap: 22, marginTop: 14 },
-  countText: { color: '#667085', fontSize: 14, fontWeight: '600' },
-  likedText: { color: '#dc2626' },
   stateCard: { backgroundColor: '#ffffff', borderRadius: 18, padding: 22, borderWidth: 1, borderColor: '#e5e9e7', marginBottom: 14, alignItems: 'center' },
   stateTitle: { fontSize: 16, fontWeight: '700', color: '#111827' },
   stateText: { marginTop: 5, fontSize: 14, color: '#667085', textAlign: 'center' },

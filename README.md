@@ -70,13 +70,13 @@ Expo tunnel mode exposes the Expo development connection only. It does not expos
 
 ## Laravel API Connection
 
-The shared Axios client is configured in `src/api/client.js`. Use a Laravel address the phone can reach, following this pattern:
+The shared Axios client reads `EXPO_PUBLIC_API_URL`. Create a local `.env.local` file and use a Laravel address the phone can reach:
 
 ```text
-http://<YOUR-PC-IP>:8000/api/v1
+EXPO_PUBLIC_API_URL=http://<YOUR-PC-IP>:8000/api/v1
 ```
 
-The Login screen currently defines its login endpoint directly in `app/login.js`. When the development PC's LAN address changes, keep that endpoint and `API_BASE_URL` in `src/api/client.js` pointed at the same Laravel host.
+When the development PC's LAN address changes, update this one value and fully reload the app in Expo Go. `.env.local` is ignored by Git and should not contain secrets; `EXPO_PUBLIC_` values are embedded in the client application.
 
 On a physical phone, `127.0.0.1` and `localhost` refer to the phone, not the development PC. Start Laravel so it accepts connections from the local network:
 

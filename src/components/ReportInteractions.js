@@ -20,6 +20,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { api, clearAuthToken, isApiConnectionError } from '../api/client';
 
+const REPORT_REASONS = [
+  { label: 'Spam', value: 'spam' },
+  { label: 'Harassment', value: 'harassment' },
+  { label: 'Inappropriate Content', value: 'inappropriate_content' },
+  { label: 'Fake Account', value: 'fake_account' },
+  { label: 'Other', value: 'other' },
+];
+
 function requestMessage(error, fallback) {
   const errors = error.response?.data?.errors;
 
@@ -52,12 +60,13 @@ function CommentAvatar({ comment }) {
   );
 }
 
-export default function ReportInteractions({ report, onReportUpdate }) {
+export default function ReportInteractions({ report, onReportUpdate, currentUserId }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const likePendingRef = useRef(false);
   const commentsLoadingRef = useRef(false);
   const commentPostingRef = useRef(false);
+  const userReportPendingRef = useRef(false);
   const [likePending, setLikePending] = useState(false);
   const [commentsVisible, setCommentsVisible] = useState(false);
   const [comments, setComments] = useState([]);
@@ -65,6 +74,10 @@ export default function ReportInteractions({ report, onReportUpdate }) {
   const [commentsError, setCommentsError] = useState(null);
   const [commentText, setCommentText] = useState('');
   const [commentPosting, setCommentPosting] = useState(false);
+  const [userReportVisible, setUserReportVisible] = useState(false);
+  const [reportReason, setReportReason] = useState('');
+  const [reportDetails, setReportDetails] = useState('');
+  const [userReportPending, setUserReportPending] = useState(false);
 
   const handleUnauthorized = useCallback(async (error) => {
     if (error.response?.status !== 401) return false;
@@ -147,8 +160,54 @@ export default function ReportInteractions({ report, onReportUpdate }) {
     }
   };
 
+  const openUserReport = () => {
+    Alert.alert(
+      'Report options',
+      `Choose an action for ${report.author?.name || 'this user'}.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Report User', style: 'destructive', onPress: () => setUserReportVisible(true) },
+      ]
+    );
+  };
+
+  const closeUserReport = () => {
+    if (!userReportPendingRef.current) setUserReportVisible(false);
+  };
+
+  const submitUserReport = async () => {
+    const authorId = report.author?.id;
+    if (!authorId || !reportReason || userReportPendingRef.current) return;
+
+    userReportPendingRef.current = true;
+    setUserReportPending(true);
+
+    try {
+      const { data } = await api.post(`/users/${authorId}/report`, {
+        reason: reportReason,
+        description: reportDetails.trim(),
+        report_id: report.id,
+      });
+
+      setUserReportVisible(false);
+      setReportReason('');
+      setReportDetails('');
+      Alert.alert('Report submitted', data.message || 'User reported successfully. Our team will review this report.');
+    } catch (error) {
+      if (!await handleUnauthorized(error)) {
+        Alert.alert('Unable to report user', requestMessage(error, 'Unable to submit the report. Please try again.'));
+      }
+    } finally {
+      userReportPendingRef.current = false;
+      setUserReportPending(false);
+    }
+  };
+
   const likesCount = Math.max(0, Number(report.likes_count) || 0);
   const commentsCount = Math.max(0, Number(report.comments_count) || 0);
+  const canReportUser = currentUserId != null
+    && report.author?.id != null
+    && String(currentUserId) !== String(report.author.id);
 
   return (
     <>
@@ -183,6 +242,18 @@ export default function ReportInteractions({ report, onReportUpdate }) {
             {commentsCount} {commentsCount === 1 ? 'Comment' : 'Comments'}
           </Text>
         </TouchableOpacity>
+
+        {canReportUser ? (
+          <TouchableOpacity
+            style={styles.overflowButton}
+            onPress={openUserReport}
+            activeOpacity={0.65}
+            accessibilityRole="button"
+            accessibilityLabel={`More actions for ${report.author?.name || 'report author'}`}
+          >
+            <FontAwesome5 name="ellipsis-h" size={15} color="#7b8580" />
+          </TouchableOpacity>
+        ) : null}
       </View>
 
       <Modal
@@ -272,6 +343,87 @@ export default function ReportInteractions({ report, onReportUpdate }) {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      <Modal
+        visible={userReportVisible}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={closeUserReport}
+      >
+        <KeyboardAvoidingView
+          style={styles.reportModalRoot}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={closeUserReport}
+            accessibilityRole="button"
+            accessibilityLabel="Close report user form"
+          />
+          <View style={[styles.reportModal, { marginBottom: Math.max(insets.bottom, 18) }]}>
+            <View style={styles.reportModalHeader}>
+              <View style={styles.reportModalTitleArea}>
+                <Text style={styles.reportModalTitle}>Report User</Text>
+                <Text style={styles.reportModalSupport}>Your report will be reviewed by the Cleanify team.</Text>
+              </View>
+              <TouchableOpacity style={styles.closeButton} onPress={closeUserReport} disabled={userReportPending} accessibilityLabel="Close report user form">
+                <FontAwesome5 name="times" size={16} color="#667085" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.reportFieldLabel}>Reason</Text>
+            <View style={styles.reasonList}>
+              {REPORT_REASONS.map((reason) => {
+                const selected = reportReason === reason.value;
+                return (
+                  <TouchableOpacity
+                    key={reason.value}
+                    style={[styles.reasonOption, selected && styles.reasonOptionSelected]}
+                    onPress={() => setReportReason(reason.value)}
+                    disabled={userReportPending}
+                    activeOpacity={0.7}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: selected }}
+                  >
+                    <View style={[styles.radioOuter, selected && styles.radioOuterSelected]}>
+                      {selected ? <View style={styles.radioInner} /> : null}
+                    </View>
+                    <Text style={[styles.reasonLabel, selected && styles.reasonLabelSelected]}>{reason.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <Text style={styles.reportFieldLabel}>Additional details (optional)</Text>
+            <TextInput
+              style={styles.reportDetailsInput}
+              value={reportDetails}
+              onChangeText={setReportDetails}
+              placeholder="Add helpful context for the review team"
+              placeholderTextColor="#9ca3af"
+              maxLength={1000}
+              multiline
+              editable={!userReportPending}
+              textAlignVertical="top"
+            />
+            <Text style={styles.reportCharacterCount}>{reportDetails.length}/1000</Text>
+
+            <View style={styles.reportModalActions}>
+              <TouchableOpacity style={styles.cancelReportButton} onPress={closeUserReport} disabled={userReportPending}>
+                <Text style={styles.cancelReportText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.submitReportButton, (!reportReason || userReportPending) && styles.submitReportButtonDisabled]}
+                onPress={submitUserReport}
+                disabled={!reportReason || userReportPending}
+              >
+                {userReportPending ? <ActivityIndicator size="small" color="#ffffff" /> : <Text style={styles.submitReportText}>Submit Report</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </>
   );
 }
@@ -279,6 +431,7 @@ export default function ReportInteractions({ report, onReportUpdate }) {
 const styles = StyleSheet.create({
   actions: { flexDirection: 'row', alignItems: 'center', gap: 20, marginTop: 13, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#edf0ee' },
   actionButton: { minHeight: 32, flexDirection: 'row', alignItems: 'center', gap: 7, paddingRight: 4 },
+  overflowButton: { width: 34, height: 32, marginLeft: 'auto', borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   actionSpinner: { width: 15 },
   actionText: { color: '#667085', fontSize: 12, fontWeight: '600' },
   actionTextActive: { color: '#17843f' },
@@ -312,4 +465,27 @@ const styles = StyleSheet.create({
   sendButtonDisabled: { opacity: 0.5 },
   sendText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
   characterCount: { position: 'absolute', right: 86, top: -17, color: '#9ca3af', fontSize: 10 },
+  reportModalRoot: { flex: 1, justifyContent: 'flex-end', paddingHorizontal: 14, backgroundColor: 'rgba(17, 24, 39, 0.38)' },
+  reportModal: { width: '100%', maxWidth: 520, alignSelf: 'center', padding: 18, backgroundColor: '#ffffff', borderRadius: 20, borderWidth: 1, borderColor: '#e5e9e7', shadowColor: '#000000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.16, shadowRadius: 20, elevation: 8 },
+  reportModalHeader: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 18 },
+  reportModalTitleArea: { flex: 1, paddingRight: 12 },
+  reportModalTitle: { color: '#111827', fontSize: 18, fontWeight: '800' },
+  reportModalSupport: { marginTop: 4, color: '#7b8580', fontSize: 11, lineHeight: 16 },
+  reportFieldLabel: { marginBottom: 8, color: '#374151', fontSize: 13, fontWeight: '700' },
+  reasonList: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 17 },
+  reasonOption: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 10, borderRadius: 10, borderWidth: 1, borderColor: '#d8ddda', backgroundColor: '#ffffff' },
+  reasonOptionSelected: { borderColor: '#c95f5f', backgroundColor: '#fff7f7' },
+  radioOuter: { width: 14, height: 14, borderRadius: 7, borderWidth: 1.5, borderColor: '#9ca3af', alignItems: 'center', justifyContent: 'center' },
+  radioOuterSelected: { borderColor: '#b84343' },
+  radioInner: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#b84343' },
+  reasonLabel: { color: '#4b5563', fontSize: 12, fontWeight: '600' },
+  reasonLabelSelected: { color: '#9f3434' },
+  reportDetailsInput: { minHeight: 94, maxHeight: 150, paddingHorizontal: 12, paddingTop: 11, paddingBottom: 11, borderWidth: 1, borderColor: '#d1d5db', borderRadius: 12, color: '#111827', fontSize: 13, lineHeight: 19 },
+  reportCharacterCount: { alignSelf: 'flex-end', marginTop: 5, color: '#9ca3af', fontSize: 10 },
+  reportModalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 9, marginTop: 16 },
+  cancelReportButton: { minWidth: 82, height: 42, paddingHorizontal: 15, borderRadius: 11, borderWidth: 1, borderColor: '#d1d5db', alignItems: 'center', justifyContent: 'center' },
+  cancelReportText: { color: '#4b5563', fontSize: 13, fontWeight: '700' },
+  submitReportButton: { minWidth: 132, height: 42, paddingHorizontal: 15, borderRadius: 11, backgroundColor: '#b84343', alignItems: 'center', justifyContent: 'center' },
+  submitReportButtonDisabled: { opacity: 0.5 },
+  submitReportText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
 });

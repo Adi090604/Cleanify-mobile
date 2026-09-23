@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import * as ImagePicker from 'expo-image-picker';
@@ -99,7 +99,7 @@ function isValidCoordinate(latitude, longitude) {
     && longitude <= 180;
 }
 
-function ReportCard({ report, onReportUpdate }) {
+function ReportCard({ report, onReportUpdate, currentUserId }) {
   const badge = STATUS_STYLES[report.status] ?? STATUS_STYLES.pending;
   return (
     <View style={styles.reportCard}>
@@ -116,7 +116,7 @@ function ReportCard({ report, onReportUpdate }) {
       <Text style={styles.description}>{report.description}</Text>
       {report.location ? <Text style={styles.location}><FontAwesome5 name="map-marker-alt" /> {report.location}</Text> : null}
       {report.image_url ? <Image source={{ uri: report.image_url }} style={styles.reportImage} resizeMode="cover" /> : null}
-      <ReportInteractions report={report} onReportUpdate={onReportUpdate} />
+      <ReportInteractions report={report} onReportUpdate={onReportUpdate} currentUserId={currentUserId} />
     </View>
   );
 }
@@ -140,6 +140,7 @@ export default function ReportScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  const [currentUserId, setCurrentUserId] = useState(null);
 
   const updateReport = useCallback((reportId, changes) => {
     setReports((current) => current.map((report) => report.id === reportId ? { ...report, ...changes } : report));
@@ -166,6 +167,22 @@ export default function ReportScreen() {
       setLoadingMore(false);
     }
   }, [router]);
+
+  const loadCurrentUser = useCallback(async () => {
+    try {
+      const { data } = await api.get('/me');
+      setCurrentUserId(data.user?.id ?? null);
+    } catch (requestError) {
+      if (requestError.response?.status === 401) {
+        await clearAuthToken();
+        router.replace('/login');
+      }
+    }
+  }, [router]);
+
+  useEffect(() => {
+    loadCurrentUser();
+  }, [loadCurrentUser]);
 
   useFocusEffect(useCallback(() => { loadReports(); }, [loadReports]));
 
@@ -327,7 +344,7 @@ export default function ReportScreen() {
         {loading ? <ActivityIndicator color="#17843f" size="large" /> : null}
         {error ? <View style={styles.stateCard}><Text style={styles.stateText}>{error}</Text></View> : null}
         {!loading && !error && reports.length === 0 ? <View style={styles.stateCard}><Text style={styles.stateText}>No reports yet.</Text></View> : null}
-        {reports.map((report) => <ReportCard key={report.id} report={report} onReportUpdate={updateReport} />)}
+        {reports.map((report) => <ReportCard key={report.id} report={report} onReportUpdate={updateReport} currentUserId={currentUserId} />)}
         {page < lastPage ? <TouchableOpacity style={styles.moreButton} onPress={() => loadReports({ nextPage: page + 1 })} disabled={loadingMore}><Text style={styles.moreText}>{loadingMore ? 'Loading...' : 'Load More'}</Text></TouchableOpacity> : null}
       </ScrollView>
     </KeyboardAvoidingView>

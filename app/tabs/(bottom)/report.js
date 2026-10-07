@@ -99,6 +99,31 @@ function isValidCoordinate(latitude, longitude) {
     && longitude <= 180;
 }
 
+const IMAGE_MIME_TYPES = {
+  gif: 'image/gif',
+  heic: 'image/heic',
+  heif: 'image/heif',
+  jpeg: 'image/jpeg',
+  jpg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+};
+
+function reportImageFile(asset) {
+  const sourceName = asset.fileName || asset.uri?.split('/').pop()?.split('?')[0] || '';
+  const sourceExtension = sourceName.includes('.') ? sourceName.split('.').pop().toLowerCase() : '';
+  const mimeType = asset.mimeType?.startsWith('image/')
+    ? asset.mimeType
+    : IMAGE_MIME_TYPES[sourceExtension] || 'image/jpeg';
+  const fallbackExtension = Object.entries(IMAGE_MIME_TYPES).find(([, value]) => value === mimeType)?.[0] || 'jpg';
+
+  return {
+    uri: asset.uri,
+    name: asset.fileName || `report-${Date.now()}.${sourceExtension || fallbackExtension}`,
+    type: mimeType,
+  };
+}
+
 function ReportCard({ report, onReportUpdate, currentUserId }) {
   const badge = STATUS_STYLES[report.status] ?? STATUS_STYLES.pending;
   return (
@@ -187,8 +212,49 @@ export default function ReportScreen() {
   useFocusEffect(useCallback(() => { loadReports(); }, [loadReports]));
 
   const choosePhoto = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: false, quality: 0.85, selectionLimit: 1 });
-    if (!result.canceled) setPhoto(result.assets[0]);
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: false, quality: 0.85, selectionLimit: 1 });
+      if (!result.canceled && result.assets?.[0]) setPhoto(result.assets[0]);
+    } catch {
+      Alert.alert('Unable to choose photo', 'The photo library could not be opened. Please try again.');
+    }
+  };
+
+  const takePhoto = async () => {
+    try {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+
+      if (!permission.granted) {
+        Alert.alert(
+          'Camera permission needed',
+          'Camera permission is needed to take a photo. You can still choose a photo from your gallery.'
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 0.85,
+      });
+
+      if (!result.canceled && result.assets?.[0]) setPhoto(result.assets[0]);
+    } catch {
+      Alert.alert('Unable to take photo', 'The camera could not be opened. You can still choose a photo from your gallery.');
+    }
+  };
+
+  const showPhotoOptions = () => {
+    Alert.alert(
+      photo ? 'Replace Photo' : 'Add Photo',
+      'Choose how you want to add a photo.',
+      [
+        { text: 'Take Photo', onPress: takePhoto },
+        { text: 'Choose from Gallery', onPress: choosePhoto },
+        { text: 'Cancel', style: 'cancel' },
+      ],
+      { cancelable: true }
+    );
   };
 
   const submitReport = async () => {
@@ -204,7 +270,7 @@ export default function ReportScreen() {
       form.append('latitude', coordinate.latitude.toFixed(8));
       form.append('longitude', coordinate.longitude.toFixed(8));
     }
-    if (photo) form.append('image', { uri: photo.uri, name: photo.fileName || `report-${Date.now()}.jpg`, type: photo.mimeType || 'image/jpeg' });
+    if (photo) form.append('image', reportImageFile(photo));
 
     try {
       await api.post('/reports', form, { headers: { 'Content-Type': 'multipart/form-data' } });
@@ -331,8 +397,16 @@ export default function ReportScreen() {
           <TextInput style={styles.input} value={location} onChangeText={setLocation} maxLength={255} placeholder="Enter location or barangay" />
           <Text style={styles.label}>Describe the issue</Text>
           <TextInput style={[styles.input, styles.textarea]} value={description} onChangeText={setDescription} maxLength={1000} multiline textAlignVertical="top" placeholder="Describe the community concern" />
-          {photo ? <Image source={{ uri: photo.uri }} style={styles.preview} resizeMode="cover" /> : null}
-          <TouchableOpacity style={styles.photoButton} onPress={choosePhoto} disabled={submitting}>
+          {photo ? (
+            <View style={styles.photoPreviewWrap}>
+              <Image source={{ uri: photo.uri }} style={styles.preview} resizeMode="cover" />
+              <TouchableOpacity style={styles.removePhotoButton} onPress={() => setPhoto(null)} disabled={submitting}>
+                <FontAwesome5 name="trash-alt" color="#9a3412" size={12} />
+                <Text style={styles.removePhotoText}>Remove Photo</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
+          <TouchableOpacity style={styles.photoButton} onPress={showPhotoOptions} disabled={submitting}>
             <FontAwesome5 name="camera" color="#17843f" size={17} /><Text style={styles.photoButtonText}>{photo ? 'Change Photo' : 'Add Photo'}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.submitButton, submitting && styles.disabled]} onPress={submitReport} disabled={submitting}>
@@ -357,6 +431,6 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 20, fontWeight: '800', color: '#17843f', marginBottom: 18 }, label: { fontSize: 14, fontWeight: '700', color: '#374151', marginBottom: 7 }, help: { fontSize: 12, color: '#6b7280', marginBottom: 9 },
   locationButton: { minHeight: 38, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: '#b9ddc4', borderRadius: 10, backgroundColor: '#f2faf4', paddingHorizontal: 12, paddingVertical: 8, marginBottom: 10 }, locationButtonText: { color: '#17843f', fontSize: 13, fontWeight: '700' },
   mapFrame: { width: '100%', height: 230, borderRadius: 12, overflow: 'hidden', backgroundColor: '#e8eee9', marginBottom: 8 }, map: { flex: 1, backgroundColor: '#e8eee9' }, mapState: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#e8eee9' }, mapStateText: { color: '#52665a', fontSize: 12 }, coordinates: { color: '#667085', fontSize: 12, marginBottom: 16 }, input: { minHeight: 48, borderWidth: 1, borderColor: '#d1d5db', borderRadius: 10, paddingHorizontal: 12, fontSize: 15, color: '#111827', marginBottom: 16 }, textarea: { height: 120, paddingTop: 12 },
-  preview: { width: '100%', height: 200, borderRadius: 12, marginBottom: 12 }, photoButton: { minHeight: 48, borderWidth: 1, borderColor: '#17843f', borderRadius: 10, flexDirection: 'row', gap: 9, alignItems: 'center', justifyContent: 'center' }, photoButtonText: { color: '#17843f', fontWeight: '700' }, submitButton: { minHeight: 50, borderRadius: 10, backgroundColor: '#17843f', alignItems: 'center', justifyContent: 'center', marginTop: 12 }, submitText: { color: '#fff', fontWeight: '800', fontSize: 15 }, disabled: { opacity: 0.6 },
+  photoPreviewWrap: { marginBottom: 12 }, preview: { width: '100%', height: 200, borderRadius: 12 }, removePhotoButton: { minHeight: 40, alignSelf: 'flex-end', flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 9, marginTop: 4 }, removePhotoText: { color: '#9a3412', fontSize: 12, fontWeight: '700' }, photoButton: { minHeight: 48, borderWidth: 1, borderColor: '#17843f', borderRadius: 10, flexDirection: 'row', gap: 9, alignItems: 'center', justifyContent: 'center' }, photoButtonText: { color: '#17843f', fontWeight: '700' }, submitButton: { minHeight: 50, borderRadius: 10, backgroundColor: '#17843f', alignItems: 'center', justifyContent: 'center', marginTop: 12 }, submitText: { color: '#fff', fontWeight: '800', fontSize: 15 }, disabled: { opacity: 0.6 },
   feedTitle: { fontSize: 21, fontWeight: '800', color: '#111827', marginBottom: 14 }, reportCard: { backgroundColor: '#fff', padding: 16, borderRadius: 16, borderWidth: 1, borderColor: '#e5e9e7', marginBottom: 14 }, reportHeader: { flexDirection: 'row', alignItems: 'center' }, avatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#17843f', alignItems: 'center', justifyContent: 'center' }, avatarText: { color: '#fff', fontSize: 16, fontWeight: '800' }, authorInfo: { flex: 1, marginLeft: 10 }, author: { fontSize: 15, fontWeight: '700', color: '#111827' }, date: { fontSize: 11, color: '#8a9390', marginTop: 3 }, badge: { paddingHorizontal: 9, paddingVertical: 5, borderRadius: 16 }, badgeText: { fontSize: 11, fontWeight: '700', textTransform: 'capitalize' }, description: { fontSize: 14, lineHeight: 21, color: '#374151', marginTop: 14 }, location: { fontSize: 13, color: '#667085', marginTop: 9 }, reportImage: { width: '100%', height: 210, borderRadius: 12, marginTop: 12 }, counts: { flexDirection: 'row', gap: 22, marginTop: 13 }, count: { color: '#667085', fontSize: 14 }, stateCard: { padding: 20, backgroundColor: '#fff', borderRadius: 14, alignItems: 'center', marginBottom: 14 }, stateText: { color: '#667085', textAlign: 'center' }, moreButton: { minHeight: 46, alignItems: 'center', justifyContent: 'center' }, moreText: { color: '#17843f', fontWeight: '700' },
 });

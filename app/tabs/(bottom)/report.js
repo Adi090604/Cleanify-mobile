@@ -4,9 +4,10 @@ import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { WebView } from 'react-native-webview';
-import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { api, clearAuthToken } from '../../../src/api/client';
+import { useCleanifyAlert } from '../../../src/components/CleanifyAlert';
 import ReportInteractions from '../../../src/components/ReportInteractions';
 
 const LEAFLET_MAP_HTML = `<!DOCTYPE html>
@@ -148,6 +149,7 @@ function ReportCard({ report, onReportUpdate, currentUserId }) {
 
 export default function ReportScreen() {
   const router = useRouter();
+  const { showAlert } = useCleanifyAlert();
   const mapRef = useRef(null);
   const [location, setLocation] = useState('');
   const [coordinate, setCoordinate] = useState(null);
@@ -216,7 +218,7 @@ export default function ReportScreen() {
       const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: false, quality: 0.85, selectionLimit: 1 });
       if (!result.canceled && result.assets?.[0]) setPhoto(result.assets[0]);
     } catch {
-      Alert.alert('Unable to choose photo', 'The photo library could not be opened. Please try again.');
+      showAlert({ type: 'error', title: 'Unable to Choose Photo', message: 'The photo library could not be opened. Please try again.' });
     }
   };
 
@@ -225,10 +227,11 @@ export default function ReportScreen() {
       const permission = await ImagePicker.requestCameraPermissionsAsync();
 
       if (!permission.granted) {
-        Alert.alert(
-          'Camera permission needed',
-          'Camera permission is needed to take a photo. You can still choose a photo from your gallery.'
-        );
+        showAlert({
+          type: 'warning',
+          title: 'Camera Permission Needed',
+          message: 'Camera permission is needed to take a photo. You can still choose a photo from your gallery.',
+        });
         return;
       }
 
@@ -240,26 +243,38 @@ export default function ReportScreen() {
 
       if (!result.canceled && result.assets?.[0]) setPhoto(result.assets[0]);
     } catch {
-      Alert.alert('Unable to take photo', 'The camera could not be opened. You can still choose a photo from your gallery.');
+      showAlert({ type: 'error', title: 'Unable to Take Photo', message: 'The camera could not be opened. You can still choose a photo from your gallery.' });
     }
   };
 
   const showPhotoOptions = () => {
-    Alert.alert(
-      photo ? 'Replace Photo' : 'Add Photo',
-      'Choose how you want to add a photo.',
-      [
-        { text: 'Take Photo', onPress: takePhoto },
-        { text: 'Choose from Gallery', onPress: choosePhoto },
-        { text: 'Cancel', style: 'cancel' },
+    showAlert({
+      type: 'info',
+      title: photo ? 'Replace Photo' : 'Add Photo',
+      message: 'Choose how you want to add a photo.',
+      cancelText: 'Cancel',
+      actions: [
+        { key: 'camera', label: 'Take Photo', description: 'Capture a new photo with your camera.', icon: 'camera', onPress: takePhoto },
+        { key: 'gallery', label: 'Choose from Gallery', description: 'Select an existing photo from your device.', icon: 'images', onPress: choosePhoto },
       ],
-      { cancelable: true }
-    );
+    });
+  };
+
+  const removePhoto = () => {
+    showAlert({
+      type: 'warning',
+      title: 'Remove Photo?',
+      message: 'This will remove the selected photo from your report.',
+      confirmText: 'Remove',
+      showCancel: true,
+      destructive: true,
+      onConfirm: () => setPhoto(null),
+    });
   };
 
   const submitReport = async () => {
     if (!description.trim()) {
-      Alert.alert('Description required', 'Please describe the issue.');
+      showAlert({ type: 'warning', title: 'Description Required', message: 'Please describe the issue.' });
       return;
     }
     setSubmitting(true);
@@ -281,10 +296,10 @@ export default function ReportScreen() {
       setMapError(false);
       setDescription('');
       setPhoto(null);
-      Alert.alert('Report submitted', 'Your report was submitted for review.');
+      showAlert({ type: 'success', title: 'Report Submitted', message: 'Your report was submitted successfully.', confirmText: 'Done' });
       await loadReports();
     } catch (requestError) {
-      Alert.alert('Unable to submit report', errorMessage(requestError));
+      showAlert({ type: 'error', title: 'Unable to Submit', message: errorMessage(requestError) });
     } finally {
       setSubmitting(false);
     }
@@ -299,12 +314,13 @@ export default function ReportScreen() {
       const permission = await Location.requestForegroundPermissionsAsync();
 
       if (permission.status !== 'granted') {
-        Alert.alert(
-          'Location permission needed',
-          permission.canAskAgain
+        showAlert({
+          type: 'warning',
+          title: 'Location Permission Needed',
+          message: permission.canAskAgain
             ? 'Allow location access to place the report marker at your current position.'
-            : 'Location access is disabled. You can enable it for Cleanify in your device settings.'
-        );
+            : 'Location access is disabled. You can enable it for Cleanify in your device settings.',
+        });
         return;
       }
 
@@ -326,10 +342,11 @@ export default function ReportScreen() {
         true;
       `);
     } catch {
-      Alert.alert(
-        'Unable to get location',
-        'Make sure location services are enabled, then try again. Your previously selected location was not changed.'
-      );
+      showAlert({
+        type: 'error',
+        title: 'Unable to Get Location',
+        message: 'Make sure location services are enabled, then try again. Your previously selected location was not changed.',
+      });
     } finally {
       setGettingLocation(false);
     }
@@ -400,7 +417,7 @@ export default function ReportScreen() {
           {photo ? (
             <View style={styles.photoPreviewWrap}>
               <Image source={{ uri: photo.uri }} style={styles.preview} resizeMode="cover" />
-              <TouchableOpacity style={styles.removePhotoButton} onPress={() => setPhoto(null)} disabled={submitting}>
+              <TouchableOpacity style={styles.removePhotoButton} onPress={removePhoto} disabled={submitting}>
                 <FontAwesome5 name="trash-alt" color="#9a3412" size={12} />
                 <Text style={styles.removePhotoText}>Remove Photo</Text>
               </TouchableOpacity>

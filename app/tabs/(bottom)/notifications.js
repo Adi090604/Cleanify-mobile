@@ -1,15 +1,17 @@
 import { useCallback, useState } from 'react';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { ActivityIndicator, Alert, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { api, clearAuthToken } from '../../../src/api/client';
+import { useCleanifyAlert } from '../../../src/components/CleanifyAlert';
 import { useNotificationBadge } from '../../../src/notifications/NotificationBadgeContext';
 
 const ICONS = { schedule: 'calendar-alt', tracker: 'truck', reports: 'comments', community: 'users', system: 'bell' };
 
 export default function NotificationsScreen() {
   const router = useRouter();
+  const { showAlert } = useCleanifyAlert();
   const { setUnreadCount: setBadgeUnreadCount } = useNotificationBadge();
   const [notifications, setNotifications] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -65,13 +67,22 @@ export default function NotificationsScreen() {
     await loadNotifications({ refresh: true });
   };
 
-  const dismiss = (notification) => Alert.alert('Dismiss notification?', 'This removes it from your notification inbox.', [
-    { text: 'Cancel', style: 'cancel' },
-    { text: 'Dismiss', style: 'destructive', onPress: async () => {
-      await api.delete('/notifications/' + notification.id);
-      await loadNotifications({ refresh: true });
-    } },
-  ]);
+  const dismiss = (notification) => showAlert({
+    type: 'warning',
+    title: 'Dismiss Notification?',
+    message: 'This removes it from your notification inbox.',
+    confirmText: 'Dismiss',
+    showCancel: true,
+    destructive: true,
+    onConfirm: async () => {
+      try {
+        await api.delete('/notifications/' + notification.id);
+        await loadNotifications({ refresh: true });
+      } catch {
+        showAlert({ type: 'error', title: 'Unable to Dismiss', message: 'The notification could not be removed. Please try again.' });
+      }
+    },
+  });
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadNotifications({ refresh: true })} colors={['#17843f']} />}>

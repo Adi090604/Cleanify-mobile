@@ -2,14 +2,16 @@ import { useCallback, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SecureStore from 'expo-secure-store';
-import { Alert, BackHandler, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { BackHandler, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { api, AUTH_TOKEN_KEY } from '../src/api/client';
+import { useCleanifyAlert } from '../src/components/CleanifyAlert';
 
 const firstError = (errors, field) => Array.isArray(errors?.[field]) ? errors[field][0] : null;
 
 export default function SignupScreen() {
   const router = useRouter();
+  const { showAlert } = useCleanifyAlert();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -47,16 +49,26 @@ export default function SignupScreen() {
       });
 
       if (!data.token) {
-        Alert.alert('Account created', 'The server did not return a login token. Please sign in with your new account.');
-        router.replace('/login');
+        showAlert({
+          type: 'warning',
+          title: 'Account Created',
+          message: 'The server did not return a login token. Please sign in with your new account.',
+          confirmText: 'Sign In',
+          onConfirm: () => router.replace('/login'),
+        });
         return;
       }
 
       try {
         await SecureStore.setItemAsync(AUTH_TOKEN_KEY, data.token);
       } catch {
-        Alert.alert('Account created', 'Your account was created, but the login session could not be saved. Please sign in.');
-        router.replace('/login');
+        showAlert({
+          type: 'warning',
+          title: 'Account Created',
+          message: 'Your account was created, but the login session could not be saved. Please sign in.',
+          confirmText: 'Sign In',
+          onConfirm: () => router.replace('/login'),
+        });
         return;
       }
       router.replace('/tabs');

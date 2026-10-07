@@ -3,7 +3,6 @@ import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import { useRouter } from 'expo-router';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Image,
   KeyboardAvoidingView,
@@ -19,6 +18,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { api, clearAuthToken, isApiConnectionError } from '../api/client';
+import { useCleanifyAlert } from './CleanifyAlert';
 
 const REPORT_REASONS = [
   { label: 'Spam', value: 'spam' },
@@ -62,6 +62,7 @@ function CommentAvatar({ comment }) {
 
 export default function ReportInteractions({ report, onReportUpdate, currentUserId }) {
   const router = useRouter();
+  const { showAlert } = useCleanifyAlert();
   const insets = useSafeAreaInsets();
   const likePendingRef = useRef(false);
   const commentsLoadingRef = useRef(false);
@@ -102,7 +103,7 @@ export default function ReportInteractions({ report, onReportUpdate, currentUser
       });
     } catch (error) {
       if (!await handleUnauthorized(error)) {
-        Alert.alert('Unable to update like', requestMessage(error, 'Please try again.'));
+        showAlert({ type: 'error', title: 'Unable to Update Like', message: requestMessage(error, 'Please try again.') });
       }
     } finally {
       likePendingRef.current = false;
@@ -152,7 +153,7 @@ export default function ReportInteractions({ report, onReportUpdate, currentUser
       setCommentsError(null);
     } catch (error) {
       if (!await handleUnauthorized(error)) {
-        Alert.alert('Unable to post comment', requestMessage(error, 'Please try again.'));
+        showAlert({ type: 'error', title: 'Unable to Post Comment', message: requestMessage(error, 'Please try again.') });
       }
     } finally {
       commentPostingRef.current = false;
@@ -161,14 +162,14 @@ export default function ReportInteractions({ report, onReportUpdate, currentUser
   };
 
   const openUserReport = () => {
-    Alert.alert(
-      'Report options',
-      `Choose an action for ${report.author?.name || 'this user'}.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Report User', style: 'destructive', onPress: () => setUserReportVisible(true) },
-      ]
-    );
+    showAlert({
+      type: 'confirm',
+      title: 'Report User?',
+      message: `Continue to report ${report.author?.name || 'this user'} to the Cleanify team?`,
+      confirmText: 'Continue',
+      showCancel: true,
+      onConfirm: () => setUserReportVisible(true),
+    });
   };
 
   const closeUserReport = () => {
@@ -192,10 +193,10 @@ export default function ReportInteractions({ report, onReportUpdate, currentUser
       setUserReportVisible(false);
       setReportReason('');
       setReportDetails('');
-      Alert.alert('Report submitted', data.message || 'User reported successfully. Our team will review this report.');
+      showAlert({ type: 'success', title: 'Report Submitted', message: data.message || 'User reported successfully. Our team will review this report.', confirmText: 'Done' });
     } catch (error) {
       if (!await handleUnauthorized(error)) {
-        Alert.alert('Unable to report user', requestMessage(error, 'Unable to submit the report. Please try again.'));
+        showAlert({ type: 'error', title: 'Unable to Report User', message: requestMessage(error, 'Unable to submit the report. Please try again.') });
       }
     } finally {
       userReportPendingRef.current = false;

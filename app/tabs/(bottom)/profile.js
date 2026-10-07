@@ -2,9 +2,10 @@ import { useCallback, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import * as ImagePicker from 'expo-image-picker';
-import { ActivityIndicator, Alert, Image, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { api, clearAuthToken, logout as logoutRequest } from '../../../src/api/client';
+import { useCleanifyAlert } from '../../../src/components/CleanifyAlert';
 
 const STATUS_STYLES = {
   pending: { backgroundColor: '#fff4d6', color: '#c47a00' },
@@ -33,6 +34,7 @@ function MyPost({ report }) {
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const { showAlert } = useCleanifyAlert();
   const [user, setUser] = useState(null);
   const [account, setAccount] = useState(null);
   const [reports, setReports] = useState([]);
@@ -65,11 +67,24 @@ export default function ProfileScreen() {
 
   useFocusEffect(useCallback(() => { loadProfile(); }, [loadProfile]));
 
-  const handleLogout = async () => {
+  const performLogout = async () => {
     if (loggingOut) return;
     setLoggingOut(true);
     await logoutRequest();
     router.replace('/login');
+  };
+
+  const handleLogout = () => {
+    showAlert({
+      type: 'confirm',
+      title: 'Log Out?',
+      message: 'Are you sure you want to log out of Cleanify?',
+      confirmText: 'Log Out',
+      showCancel: true,
+      destructive: true,
+      dismissible: true,
+      onConfirm: performLogout,
+    });
   };
 
   const chooseProfilePhoto = async () => {
@@ -88,32 +103,35 @@ export default function ProfileScreen() {
     try {
       await api.post('/me/profile-photo', form, { headers: { 'Content-Type': 'multipart/form-data' } });
       await loadProfile();
-      Alert.alert('Photo updated', 'Your profile photo has been updated.');
+      showAlert({ type: 'success', title: 'Photo Updated', message: 'Your profile photo has been updated.', confirmText: 'Done' });
     } catch (requestError) {
       const errors = requestError.response?.data?.errors;
-      Alert.alert('Unable to update photo', (errors && Object.values(errors).flat()[0]) || requestError.response?.data?.message || 'Please try another image.');
+      showAlert({ type: 'error', title: 'Unable to Update Photo', message: (errors && Object.values(errors).flat()[0]) || requestError.response?.data?.message || 'Please try another image.' });
     } finally {
       setPhotoBusy(false);
     }
   };
 
   const removeProfilePhoto = () => {
-    Alert.alert('Remove profile photo?', 'Your initials will be shown instead.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove', style: 'destructive', onPress: async () => {
-          setPhotoBusy(true);
-          try {
-            await api.delete('/me/profile-photo');
-            await loadProfile();
-          } catch (requestError) {
-            Alert.alert('Unable to remove photo', requestError.response?.data?.message || 'Please try again.');
-          } finally {
-            setPhotoBusy(false);
-          }
-        },
+    showAlert({
+      type: 'warning',
+      title: 'Remove Profile Photo?',
+      message: 'Your initials will be shown instead.',
+      confirmText: 'Remove',
+      showCancel: true,
+      destructive: true,
+      onConfirm: async () => {
+        setPhotoBusy(true);
+        try {
+          await api.delete('/me/profile-photo');
+          await loadProfile();
+        } catch (requestError) {
+          showAlert({ type: 'error', title: 'Unable to Remove Photo', message: requestError.response?.data?.message || 'Please try again.' });
+        } finally {
+          setPhotoBusy(false);
+        }
       },
-    ]);
+    });
   };
 
   if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#17843f" /></View>;

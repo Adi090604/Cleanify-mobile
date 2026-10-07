@@ -5,6 +5,7 @@ import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import { ActivityIndicator, AppState, Image, StyleSheet, Text, View } from 'react-native';
 
 import { api, clearAuthToken, logout } from '../../src/api/client';
+import { useCleanifyAlert } from '../../src/components/CleanifyAlert';
 import { NotificationBadgeContext, useNotificationBadge } from '../../src/notifications/NotificationBadgeContext';
 
 const ITEMS = [
@@ -19,6 +20,7 @@ const ITEMS = [
 
 function CleanifyDrawerContent(props) {
   const router = useRouter();
+  const { showAlert } = useCleanifyAlert();
   const pathname = usePathname();
   const drawerStatus = useDrawerStatus();
   const [user, setUser] = useState(null);
@@ -53,12 +55,24 @@ function CleanifyDrawerContent(props) {
     router.navigate(href);
   };
 
-  const signOut = async () => {
+  const performSignOut = async () => {
     if (loggingOut) return;
     setLoggingOut(true);
     await logout();
     props.navigation.closeDrawer();
     router.replace('/login');
+  };
+
+  const signOut = () => {
+    showAlert({
+      type: 'confirm',
+      title: 'Log Out?',
+      message: 'Are you sure you want to log out of Cleanify?',
+      confirmText: 'Log Out',
+      showCancel: true,
+      destructive: true,
+      onConfirm: performSignOut,
+    });
   };
 
   return (

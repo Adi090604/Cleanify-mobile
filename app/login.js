@@ -4,9 +4,9 @@ import { StatusBar } from 'expo-status-bar';
 import * as SecureStore from 'expo-secure-store';
 
 import { api, AUTH_TOKEN_KEY, isApiConnectionError } from '../src/api/client';
+import { useCleanifyAlert } from '../src/components/CleanifyAlert';
 
 import {
-  Alert,
   BackHandler,
   StyleSheet,
   Text,
@@ -17,6 +17,7 @@ import {
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { showAlert } = useCleanifyAlert();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -35,10 +36,7 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert(
-        'Missing information',
-        'Please enter your email and password.'
-      );
+      showAlert({ type: 'warning', title: 'Missing Information', message: 'Please enter your email and password.' });
       return;
     }
 
@@ -53,10 +51,7 @@ export default function LoginScreen() {
       const token = response.data.token;
 
       if (!token) {
-        Alert.alert(
-          'Login failed',
-          'The server did not return an authentication token.'
-        );
+        showAlert({ type: 'error', title: 'Login Failed', message: 'The server did not return an authentication token.' });
         return;
       }
 
@@ -68,7 +63,7 @@ export default function LoginScreen() {
         ? 'Unable to connect to the Cleanify server. Check your network connection and try again.'
         : 'Unable to sign in. Please try again.');
 
-      Alert.alert('Login failed', message);
+      showAlert({ type: 'error', title: 'Login Failed', message });
     } finally {
       setLoading(false);
     }

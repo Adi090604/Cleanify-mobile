@@ -6,7 +6,6 @@ import * as Location from 'expo-location';
 import { WebView } from 'react-native-webview';
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -21,6 +20,7 @@ import {
 } from 'react-native';
 
 import { api, clearAuthToken } from '../../src/api/client';
+import { useCleanifyAlert } from '../../src/components/CleanifyAlert';
 
 const CATEGORY_LABELS = {
   report_updates: 'Report Updates',
@@ -191,6 +191,7 @@ function FieldError({ value }) {
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const { showAlert } = useCleanifyAlert();
   const submissionInFlight = useRef(false);
   const locationMapRef = useRef(null);
   const [loading, setLoading] = useState(true);
@@ -239,13 +240,13 @@ export default function SettingsScreen() {
         await clearAuthToken();
         router.replace('/login');
       } else {
-        Alert.alert('Unable to load settings', messageFor(error));
+        showAlert({ type: 'error', title: 'Unable to Load Settings', message: messageFor(error) });
       }
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [router]);
+  }, [router, showAlert]);
 
   const loadLatestRequest = useCallback(async () => {
     setRequestLoading(true);
@@ -285,10 +286,10 @@ export default function SettingsScreen() {
         phone: phone.trim() || null,
         service_area: serviceArea || null,
       });
-      Alert.alert('Saved', 'Account information updated successfully.');
+      showAlert({ type: 'success', title: 'Changes Saved', message: 'Account information updated successfully.', confirmText: 'Done' });
       await loadSettings();
     } catch (error) {
-      Alert.alert('Unable to save account', messageFor(error));
+      showAlert({ type: 'error', title: 'Unable to Save Account', message: messageFor(error) });
     } finally {
       setSaving(null);
     }
@@ -305,9 +306,9 @@ export default function SettingsScreen() {
       setCurrentPassword('');
       setPassword('');
       setPasswordConfirmation('');
-      Alert.alert('Updated', 'Password updated successfully.');
+      showAlert({ type: 'success', title: 'Password Updated', message: 'Your password was updated successfully.', confirmText: 'Done' });
     } catch (error) {
-      Alert.alert('Unable to update password', messageFor(error));
+      showAlert({ type: 'error', title: 'Unable to Update Password', message: messageFor(error) });
     } finally {
       setSaving(null);
     }
@@ -328,10 +329,10 @@ export default function SettingsScreen() {
     setSaving('notifications');
     try {
       await api.patch('/settings/notifications', notifications);
-      Alert.alert('Saved', 'Notification preferences updated successfully.');
+      showAlert({ type: 'success', title: 'Preferences Saved', message: 'Notification preferences updated successfully.', confirmText: 'Done' });
       await loadSettings();
     } catch (error) {
-      Alert.alert('Unable to save preferences', messageFor(error));
+      showAlert({ type: 'error', title: 'Unable to Save Preferences', message: messageFor(error) });
     } finally {
       setSaving(null);
     }
@@ -520,7 +521,7 @@ export default function SettingsScreen() {
       setRequestModalVisible(false);
       resetRequestForm();
       await loadLatestRequest();
-      Alert.alert('Request submitted', 'Your service area request is now pending review.');
+      showAlert({ type: 'success', title: 'Request Submitted', message: 'Your service area request is now pending review.', confirmText: 'Done' });
     } catch (error) {
       const errors = error.response?.data?.errors;
       if (errors) setRequestFormErrors(errors);

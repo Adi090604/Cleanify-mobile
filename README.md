@@ -221,7 +221,6 @@ The Truck Tracker loads real truck and service-zone data from Laravel. Its Leafl
 - Search and status filtering
 - Service-zone circle highlighting
 - **Focus**, which centers the selected truck at zoom level `15` and opens its popup
-- **Route**, which requests and draws route history only when selected
 - A normal-marker fallback if optional clustering is unavailable
 - A retry state with surfaced WebView/Leaflet errors
 - Coordinate validation and safe handling of trucks without a location

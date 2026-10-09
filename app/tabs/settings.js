@@ -22,13 +22,6 @@ import {
 import { api, clearAuthToken } from '../../src/api/client';
 import { useCleanifyAlert } from '../../src/components/CleanifyAlert';
 
-const CATEGORY_LABELS = {
-  report_updates: 'Report Updates',
-  schedule_reminders: 'Schedule Reminders',
-  community_posts: 'Community Posts',
-  truck_tracking: 'Truck Tracking',
-};
-
 function messageFor(error, fallback = 'Unable to save changes. Please try again.') {
   const errors = error.response?.data?.errors;
   if (errors) return Object.values(errors).flat()[0];
@@ -170,16 +163,20 @@ function Section({ title, children }) {
   );
 }
 
-function PreferenceRow({ label, value, onValueChange }) {
+function PreferenceRow({ label, value, onValueChange, unavailable = false }) {
   return (
     <View style={styles.preferenceRow}>
       <Text style={styles.preferenceLabel}>{label}</Text>
-      <Switch
-        value={value}
-        onValueChange={onValueChange}
-        trackColor={{ false: '#d1d5db', true: '#86d39d' }}
-        thumbColor={value ? '#17843f' : '#f4f4f5'}
-      />
+      {unavailable ? (
+        <Text style={styles.preferenceUnavailable}>Unavailable</Text>
+      ) : (
+        <Switch
+          value={value}
+          onValueChange={onValueChange}
+          trackColor={{ false: '#d1d5db', true: '#86d39d' }}
+          thumbColor={value ? '#17843f' : '#f4f4f5'}
+        />
+      )}
     </View>
   );
 }
@@ -193,6 +190,7 @@ export default function SettingsScreen() {
   const router = useRouter();
   const { showAlert } = useCleanifyAlert();
   const submissionInFlight = useRef(false);
+  const notificationSaveInFlight = useRef(false);
   const locationMapRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -234,7 +232,13 @@ export default function SettingsScreen() {
       setServiceArea(data.account.service_area || '');
       setOfficialServiceArea(data.account.service_area || '');
       setServiceAreas(data.service_areas || []);
-      setNotifications(data.notifications);
+      setNotifications({
+        email_notifications: data.notifications.email_notifications,
+        sms_notifications: data.notifications.sms_notifications,
+        report_updates: data.notifications.report_updates,
+        schedule_reminders: data.notifications.schedule_reminders,
+        push_available: data.notifications.push_available,
+      });
     } catch (error) {
       if (error.response?.status === 401) {
         await clearAuthToken();
@@ -314,26 +318,28 @@ export default function SettingsScreen() {
     }
   };
 
-  const setGlobalPreference = (key, value) => {
+  const setNotificationPreference = (key, value) => {
     setNotifications((current) => ({ ...current, [key]: value }));
   };
 
-  const setCategoryPreference = (key, value) => {
-    setNotifications((current) => ({
-      ...current,
-      preferences: { ...current.preferences, [key]: value },
-    }));
-  };
-
   const saveNotifications = async () => {
+    if (notificationSaveInFlight.current) return;
+
+    notificationSaveInFlight.current = true;
     setSaving('notifications');
     try {
-      await api.patch('/settings/notifications', notifications);
+      await api.patch('/settings/notifications', {
+        email_notifications: notifications.email_notifications,
+        sms_notifications: notifications.sms_notifications,
+        report_updates: notifications.report_updates,
+        schedule_reminders: notifications.schedule_reminders,
+      });
       showAlert({ type: 'success', title: 'Preferences Saved', message: 'Notification preferences updated successfully.', confirmText: 'Done' });
       await loadSettings();
     } catch (error) {
       showAlert({ type: 'error', title: 'Unable to Save Preferences', message: messageFor(error) });
     } finally {
+      notificationSaveInFlight.current = false;
       setSaving(null);
     }
   };
@@ -657,13 +663,12 @@ export default function SettingsScreen() {
 
         <Section title="Notification Preferences">
           <Text style={styles.subheading}>Global Settings</Text>
-          <PreferenceRow label="Email Notifications" value={notifications.email_notifications} onValueChange={(value) => setGlobalPreference('email_notifications', value)} />
-          <PreferenceRow label="SMS Notifications" value={notifications.sms_notifications} onValueChange={(value) => setGlobalPreference('sms_notifications', value)} />
-          <PreferenceRow label="Push Notifications" value={notifications.push_notifications} onValueChange={(value) => setGlobalPreference('push_notifications', value)} />
+          <PreferenceRow label="Email Notifications" value={notifications.email_notifications} onValueChange={(value) => setNotificationPreference('email_notifications', value)} />
+          <PreferenceRow label="SMS Notifications" value={notifications.sms_notifications} onValueChange={(value) => setNotificationPreference('sms_notifications', value)} />
+          {notifications.push_available === false ? <PreferenceRow label="Push Notifications" unavailable /> : null}
           <Text style={styles.subheading}>Notification Categories</Text>
-          {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
-            <PreferenceRow key={key} label={label} value={notifications.preferences[key]} onValueChange={(value) => setCategoryPreference(key, value)} />
-          ))}
+          <PreferenceRow label="Report Updates" value={notifications.report_updates} onValueChange={(value) => setNotificationPreference('report_updates', value)} />
+          <PreferenceRow label="Schedule Reminders" value={notifications.schedule_reminders} onValueChange={(value) => setNotificationPreference('schedule_reminders', value)} />
           <TouchableOpacity style={styles.button} onPress={saveNotifications} disabled={saving !== null}>
             <Text style={styles.buttonText}>{saving === 'notifications' ? 'Saving...' : 'Save Preferences'}</Text>
           </TouchableOpacity>
@@ -850,6 +855,7 @@ const styles = StyleSheet.create({
   help: { color: '#6b7280', fontSize: 12, lineHeight: 18, marginBottom: 14 },
   preferenceRow: { minHeight: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#edf0ee' },
   preferenceLabel: { flex: 1, color: '#374151', fontSize: 14, marginRight: 12 },
+  preferenceUnavailable: { color: '#8a9390', fontSize: 12, fontWeight: '600' },
   button: { minHeight: 48, backgroundColor: '#17843f', borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 16 },
   buttonText: { color: '#ffffff', fontSize: 15, fontWeight: '800' },
   currentAreaLabel: { color: '#7b8580', fontSize: 10, fontWeight: '800', letterSpacing: 0.8, marginBottom: 8 },

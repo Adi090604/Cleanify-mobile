@@ -29,7 +29,7 @@ const MAP_HTML = `<!DOCTYPE html><html><head>
 document.addEventListener('DOMContentLoaded',function(){
  try {
   if(!window.L)throw new Error('Leaflet is unavailable');
-  var map=L.map('map').setView([9.7870,125.4928],13),markers={},zones={},routeLayer=null,selectedTruckId=null,initialized=false;
+  var map=L.map('map').setView([9.7870,125.4928],13),markers={},zones={},selectedTruckId=null,initialized=false;
   var cluster=typeof L.markerClusterGroup==='function'?L.markerClusterGroup({showCoverageOnHover:false}):L.layerGroup();
   cluster.addTo(map);
   var colors={active:'#17843f',on_break:'#d99a08',offline:'#dc2626',maintenance:'#2563eb'};
@@ -53,7 +53,6 @@ document.addEventListener('DOMContentLoaded',function(){
   });Object.keys(zones).forEach(function(id){if(!seen[id]){map.removeLayer(zones[id]);delete zones[id];}});if(selected&&zones[selected])map.setView(zones[selected].getLatLng(),14);};
   window.selectTruck=function(id){selectMarker(id,false);};
   window.focusTruck=function(id){if(markers[id]){selectMarker(id,false);map.setView(markers[id].getLatLng(),15);markers[id].openPopup();post({type:'focus_result',truckId:id,success:true});}else post({type:'focus_result',truckId:id,success:false});};
-  window.showRoute=function(points){if(routeLayer)map.removeLayer(routeLayer);var validPoints=(points||[]).map(function(p){return[Number(p.latitude),Number(p.longitude)];}).filter(function(p){return valid(p[0],p[1]);});if(!validPoints.length)return;routeLayer=L.polyline(validPoints,{color:'#2563eb',weight:4,opacity:.7}).addTo(map);map.fitBounds(routeLayer.getBounds(),{padding:[30,30]});};
   setTimeout(function(){map.invalidateSize();post({type:'map_ready'});},0);
  } catch(error){mapError(error&&error.message?error.message:error);}
 });
@@ -75,7 +74,6 @@ export default function TrackerScreen() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('all');
   const [countdown, setCountdown] = useState(30);
-  const [routeLoading, setRouteLoading] = useState(null);
   const [selectedTruckId, setSelectedTruckId] = useState(null);
   const [mapNotice, setMapNotice] = useState(null);
   const [mapConfig, setMapConfig] = useState({ center: DEFAULT_CENTER, zoom: 13 });
@@ -146,19 +144,6 @@ export default function TrackerScreen() {
     if (mapReady && hasValidCoordinates(truck)) webView.current?.injectJavaScript(`window.selectTruck(${JSON.stringify(truck.id)});true;`);
   };
 
-  const showRoute = async (truck) => {
-    setRouteLoading(truck.id);
-    try {
-      const { data } = await api.get(`/trucks/${truck.id}/route-history`);
-      const points = Array.isArray(data.locations) ? data.locations : [];
-      if (!points.length) setMapNotice('No route history is available for this truck in the last 24 hours.');
-      else setMapNotice(null);
-      webView.current?.injectJavaScript(`window.showRoute(${JSON.stringify(points)});true;`);
-    } catch {
-      setError('Unable to load this truck’s route history.');
-    } finally { setRouteLoading(null); }
-  };
-
   const focusTruck = (truck) => {
     setSelectedTruckId(truck.id);
     if (!hasValidCoordinates(truck)) { setMapNotice('No live location is available for this truck.'); return; }
@@ -207,7 +192,7 @@ export default function TrackerScreen() {
         <Text style={styles.detailLine}><Text style={styles.detailLabel}>Last update: </Text>{selectedTruck.last_updated_human || 'Never'}</Text>
         {hasValidCoordinates(selectedTruck) ? <Text style={styles.detailCoordinates}>{Number(selectedTruck.latitude).toFixed(6)}, {Number(selectedTruck.longitude).toFixed(6)}</Text> : <Text style={styles.noLocation}>No live location</Text>}
         {mapNotice ? <Text style={styles.mapNotice}>{mapNotice}</Text> : null}
-        {hasValidCoordinates(selectedTruck) ? <View style={styles.actions}><TouchableOpacity style={styles.action} onPress={() => focusTruck(selectedTruck)}><Text style={styles.actionText}>Focus</Text></TouchableOpacity><TouchableOpacity style={styles.action} disabled={routeLoading === selectedTruck.id} onPress={() => showRoute(selectedTruck)}><Text style={styles.routeAction}>{routeLoading === selectedTruck.id ? 'Loading...' : 'Route'}</Text></TouchableOpacity></View> : null}
+        {hasValidCoordinates(selectedTruck) ? <View style={styles.actions}><TouchableOpacity style={styles.action} onPress={() => focusTruck(selectedTruck)}><Text style={styles.actionText}>Focus</Text></TouchableOpacity></View> : null}
       </View> : null}
       <View style={styles.sectionRow}><Text style={styles.sectionTitle}>Active Trucks</Text><Text style={styles.refreshNote}>{filteredTrucks.length} shown · {trucks.length} total</Text></View>
       {loading ? <ActivityIndicator color="#17843f" size="large" /> : null}
@@ -227,7 +212,7 @@ export default function TrackerScreen() {
             <Text style={styles.route}><FontAwesome5 name="route" size={12} /> {truck.route || 'Route not assigned'}</Text>
             <Text style={located ? styles.onMap : styles.noLocation}><FontAwesome5 name="map-marker-alt" size={12} /> {located ? 'On map' : 'No location'}</Text>
             <Text style={styles.updated}>Last updated: {truck.last_updated_human || 'Never'}</Text>
-            {located ? <View style={styles.actions}><TouchableOpacity style={styles.action} onPress={() => focusTruck(truck)}><Text style={styles.actionText}>Focus</Text></TouchableOpacity><TouchableOpacity style={styles.action} disabled={routeLoading === truck.id} onPress={() => showRoute(truck)}><Text style={styles.routeAction}>{routeLoading === truck.id ? 'Loading...' : 'Route'}</Text></TouchableOpacity></View> : null}
+            {located ? <View style={styles.actions}><TouchableOpacity style={styles.action} onPress={() => focusTruck(truck)}><Text style={styles.actionText}>Focus</Text></TouchableOpacity></View> : null}
           </TouchableOpacity>
         );
       })}
@@ -248,6 +233,6 @@ const styles = StyleSheet.create({
   detailCard: { backgroundColor: '#fff', padding: 16, borderRadius: 16, borderWidth: 1, borderColor: '#cce8d3', marginBottom: 22 }, detailHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }, detailEyebrow: { color: '#17843f', fontSize: 10, fontWeight: '800', letterSpacing: 0.8 }, detailCode: { color: '#111827', fontSize: 19, fontWeight: '800', marginTop: 2 }, detailLine: { color: '#59635e', fontSize: 13, lineHeight: 21 }, detailLabel: { color: '#374151', fontWeight: '700' }, detailCoordinates: { color: '#17843f', fontSize: 12, marginTop: 7 }, mapNotice: { color: '#9a3412', fontSize: 12, marginTop: 8 },
   truckCard: { backgroundColor: '#fff', padding: 16, borderRadius: 16, borderWidth: 1, borderColor: '#e5e9e7', marginBottom: 13 }, selectedTruckCard: { borderColor: '#17843f', backgroundColor: '#f4fbf6' }, truckHeader: { flexDirection: 'row', alignItems: 'center' }, truckIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#17843f', alignItems: 'center', justifyContent: 'center' },
   truckHeading: { flex: 1, marginLeft: 10 }, truckCode: { fontSize: 16, fontWeight: '800', color: '#111827' }, driver: { fontSize: 12, color: '#667085', marginTop: 2 }, badge: { borderRadius: 16, paddingHorizontal: 9, paddingVertical: 5 }, badgeText: { fontSize: 11, fontWeight: '700' },
-  route: { color: '#4b5563', fontSize: 13, marginTop: 13 }, onMap: { color: '#17843f', fontSize: 12, marginTop: 8 }, updated: { color: '#8a9390', fontSize: 11, marginTop: 5 }, noLocation: { color: '#9a3412', fontSize: 12, marginTop: 8 }, actions: { flexDirection: 'row', gap: 9, marginTop: 12 }, action: { flex: 1, height: 38, borderWidth: 1, borderColor: '#d9dedb', borderRadius: 9, alignItems: 'center', justifyContent: 'center' }, actionText: { color: '#17843f', fontWeight: '700', fontSize: 12 }, routeAction: { color: '#2563eb', fontWeight: '700', fontSize: 12 },
+  route: { color: '#4b5563', fontSize: 13, marginTop: 13 }, onMap: { color: '#17843f', fontSize: 12, marginTop: 8 }, updated: { color: '#8a9390', fontSize: 11, marginTop: 5 }, noLocation: { color: '#9a3412', fontSize: 12, marginTop: 8 }, actions: { flexDirection: 'row', gap: 9, marginTop: 12 }, action: { flex: 1, height: 38, borderWidth: 1, borderColor: '#d9dedb', borderRadius: 9, alignItems: 'center', justifyContent: 'center' }, actionText: { color: '#17843f', fontWeight: '700', fontSize: 12 },
   stateCard: { padding: 20, borderRadius: 14, backgroundColor: '#fff', alignItems: 'center', marginBottom: 13 }, stateText: { color: '#667085', textAlign: 'center' },
 });

@@ -39,9 +39,17 @@ function PickupCard({ pickup }) {
   );
 }
 
+function scheduleReminderMessage(preferences) {
+  if (!preferences) return null;
+  if (!preferences.schedule_reminders) return 'Schedule reminders are currently turned off.';
+  if (preferences.email_notifications) return "We'll remind you by email 1 day before your scheduled collection.";
+  return 'Schedule reminders are enabled. Manage your reminder options in Settings.';
+}
+
 export default function ScheduleScreen() {
   const router = useRouter();
   const [scheduleData, setScheduleData] = useState(null);
+  const [reminderPreferences, setReminderPreferences] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
@@ -68,10 +76,29 @@ export default function ScheduleScreen() {
     }
   }, [router]);
 
+  const loadReminderPreferences = useCallback(async () => {
+    setReminderPreferences(null);
+
+    try {
+      const { data } = await api.get('/settings');
+      const notifications = data.notifications;
+
+      if (typeof notifications?.schedule_reminders !== 'boolean' || typeof notifications?.email_notifications !== 'boolean') return;
+
+      setReminderPreferences({
+        schedule_reminders: notifications.schedule_reminders,
+        email_notifications: notifications.email_notifications,
+      });
+    } catch {
+      // Schedule content remains available when reminder preferences cannot be loaded.
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       loadSchedules();
-    }, [loadSchedules])
+      loadReminderPreferences();
+    }, [loadReminderPreferences, loadSchedules])
   );
 
   if (loading) {
@@ -88,6 +115,7 @@ export default function ScheduleScreen() {
     || pickup.collection_at !== nextCollection?.collection_at
   ));
   const nextCollectionDate = nextCollection ? new Date(nextCollection.collection_at) : null;
+  const reminderMessage = scheduleReminderMessage(reminderPreferences);
 
   return (
     <View style={styles.container}>
@@ -173,6 +201,19 @@ export default function ScheduleScreen() {
                     </View>
                   </View>
                 </View>
+                {reminderMessage ? (
+                  <View style={styles.reminderNotice}>
+                    <View style={styles.reminderIcon}>
+                      <FontAwesome5 name="bell" size={11} color="#17843f" />
+                    </View>
+                    <View style={styles.reminderContent}>
+                      <Text style={styles.reminderText}>{reminderMessage}</Text>
+                      <TouchableOpacity onPress={() => router.navigate('/tabs/settings')} activeOpacity={0.7}>
+                        <Text style={styles.reminderLink}>Manage in Settings</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ) : null}
               </View>
             ) : (
               <View style={styles.stateCard}>
@@ -236,6 +277,11 @@ const styles = StyleSheet.create({
   detailValue: { marginTop: 2, fontSize: 12.5, lineHeight: 17, fontWeight: '600', color: '#374151' },
   featuredDetailValue: { marginTop: 2, fontSize: 14, lineHeight: 19, fontWeight: '800', color: '#18211c' },
   detailDivider: { height: 1, marginLeft: 40, backgroundColor: '#edf1ee' },
+  reminderNotice: { flexDirection: 'row', alignItems: 'flex-start', marginTop: 11, paddingHorizontal: 10, paddingVertical: 9, borderRadius: 11, backgroundColor: '#e5f4e9' },
+  reminderIcon: { width: 24, height: 24, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#ffffff', marginRight: 8 },
+  reminderContent: { flex: 1, minWidth: 0 },
+  reminderText: { color: '#3f5f49', fontSize: 10.5, lineHeight: 15 },
+  reminderLink: { alignSelf: 'flex-start', marginTop: 4, color: '#17843f', fontSize: 10.5, fontWeight: '800' },
   sectionHeader: { marginBottom: 12 },
   sectionTitle: { fontSize: 20, fontWeight: '800', color: '#111827' },
   sectionSupport: { marginTop: 3, fontSize: 11.5, lineHeight: 16, color: '#7b8580' },

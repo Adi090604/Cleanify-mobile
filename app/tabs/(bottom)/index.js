@@ -56,12 +56,10 @@ function ReportCard({ report, onReportUpdate, currentUserId }) {
       </View>
 
       <Text style={styles.reportDescription}>{report.description}</Text>
-      {report.location ? (
-        <View style={styles.locationRow}>
-          <FontAwesome5 name="map-marker-alt" size={11} color="#6f7b75" />
-          <Text style={styles.location}>{report.location}</Text>
-        </View>
-      ) : null}
+      <View style={styles.locationRow}>
+        <FontAwesome5 name="map-marker-alt" size={11} color="#6f7b75" />
+        <Text style={styles.location}>{report.barangay || 'Barangay not recorded'} · {report.location || 'Location not recorded'}</Text>
+      </View>
       {report.image_url ? (
         <Image
           source={{ uri: report.image_url }}
@@ -96,7 +94,7 @@ export default function HomeScreen() {
     try {
       const [userResponse, reportsResponse, scheduleResponse] = await Promise.all([
         api.get('/me'),
-        api.get('/reports'),
+        api.get('/reports/home'),
         api.get('/schedules/next'),
       ]);
 

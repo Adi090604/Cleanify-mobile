@@ -24,7 +24,7 @@ function MyPost({ report, onReportUpdate, currentUserId }) {
         <View style={[styles.badge, { backgroundColor: badge.backgroundColor }]}><Text style={[styles.badgeText, { color: badge.color }]}>{report.status.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase())}</Text></View>
       </View>
       <Text style={styles.description}>{report.description}</Text>
-      {report.location ? <Text style={styles.location}><FontAwesome5 name="map-marker-alt" /> {report.location}</Text> : null}
+      <Text style={styles.location}><FontAwesome5 name="map-marker-alt" /> {report.barangay || 'Barangay not recorded'} · {report.location || 'Location not recorded'}</Text>
       {report.image_url ? <Image source={{ uri: report.image_url }} style={styles.postImage} resizeMode="cover" /> : null}
       <ReportInteractions report={report} onReportUpdate={onReportUpdate} currentUserId={currentUserId} />
     </View>

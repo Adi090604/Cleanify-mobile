@@ -52,6 +52,7 @@ export default function TabLayout() {
       <Tabs.Screen name="tracker" options={{ title: 'Tracker', tabBarIcon: ({ color }) => <TabIcon name="truck" color={color} size={18} /> }} />
       <Tabs.Screen name="notifications" options={{ title: 'Notifications', tabBarIcon: ({ color }) => <NotificationTabIcon color={color} size={18} unreadCount={unreadCount} /> }} />
       <Tabs.Screen name="profile" options={{ href: null }} />
+      <Tabs.Screen name="report-details" options={{ href: null }} />
     </Tabs>
   );
 }

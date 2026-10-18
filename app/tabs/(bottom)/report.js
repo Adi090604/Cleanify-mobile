@@ -126,7 +126,7 @@ function reportImageFile(asset) {
   };
 }
 
-function ReportCard({ report, onReportUpdate, currentUserId }) {
+function ReportCard({ report, onReportUpdate, currentUserId, onViewDetails }) {
   const badge = STATUS_STYLES[report.status] ?? STATUS_STYLES.pending;
   return (
     <View style={styles.reportCard}>
@@ -141,8 +141,12 @@ function ReportCard({ report, onReportUpdate, currentUserId }) {
         </View>
       </View>
       <Text style={styles.description}>{report.description}</Text>
-      {report.location ? <Text style={styles.location}><FontAwesome5 name="map-marker-alt" /> {report.location}</Text> : null}
+      <Text style={styles.location}><FontAwesome5 name="map-marker-alt" /> {report.barangay || 'Barangay not recorded'} · {report.location || 'Location not recorded'}</Text>
       {report.image_url ? <Image source={{ uri: report.image_url }} style={styles.reportImage} resizeMode="cover" /> : null}
+      <TouchableOpacity style={styles.detailsButton} onPress={() => onViewDetails(report.id)} activeOpacity={0.7}>
+        <FontAwesome5 name="clipboard-list" size={13} color="#17843f" />
+        <Text style={styles.detailsButtonText}>View Details</Text>
+      </TouchableOpacity>
       <ReportInteractions report={report} onReportUpdate={onReportUpdate} currentUserId={currentUserId} />
     </View>
   );
@@ -152,6 +156,7 @@ export default function ReportScreen() {
   const router = useRouter();
   const { showAlert } = useCleanifyAlert();
   const mapRef = useRef(null);
+  const [barangay, setBarangay] = useState('');
   const [location, setLocation] = useState('');
   const [coordinate, setCoordinate] = useState(null);
   const [gettingLocation, setGettingLocation] = useState(false);
@@ -274,14 +279,23 @@ export default function ReportScreen() {
   };
 
   const submitReport = async () => {
+    if (!barangay.trim()) {
+      showAlert({ type: 'warning', title: 'Barangay Required', message: 'Barangay is required.' });
+      return;
+    }
+    if (!location.trim()) {
+      showAlert({ type: 'warning', title: 'Specific Location Required', message: 'Please enter the specific location or a nearby landmark.' });
+      return;
+    }
     if (!description.trim()) {
       showAlert({ type: 'warning', title: 'Description Required', message: 'Please describe the issue.' });
       return;
     }
     setSubmitting(true);
     const form = new FormData();
+    form.append('barangay', barangay.trim());
+    form.append('location', location.trim());
     form.append('description', description.trim());
-    if (location.trim()) form.append('location', location.trim());
     if (coordinate) {
       form.append('latitude', coordinate.latitude.toFixed(8));
       form.append('longitude', coordinate.longitude.toFixed(8));
@@ -290,6 +304,7 @@ export default function ReportScreen() {
 
     try {
       await api.post('/reports', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+      setBarangay('');
       setLocation('');
       setCoordinate(null);
       setMapKey((current) => current + 1);
@@ -376,7 +391,11 @@ export default function ReportScreen() {
         <Text style={styles.title}>Community Reports</Text>
         <View style={styles.formCard}>
           <Text style={styles.sectionTitle}>Create Report</Text>
-          <Text style={styles.label}>Report Location</Text>
+          <Text style={styles.label}>Barangay *</Text>
+          <TextInput style={styles.input} value={barangay} onChangeText={setBarangay} maxLength={255} placeholder="Enter barangay" />
+          <Text style={styles.label}>Specific Location / Landmark *</Text>
+          <TextInput style={styles.input} value={location} onChangeText={setLocation} maxLength={255} placeholder="e.g. Purok 3, beside Barangay Hall" />
+          <Text style={styles.label}>GPS Location (optional)</Text>
           <Text style={styles.help}>Tap or drag the marker to select the issue location.</Text>
           <TouchableOpacity
             style={[styles.locationButton, (gettingLocation || mapLoading || mapError) && styles.disabled]}
@@ -390,7 +409,7 @@ export default function ReportScreen() {
               <FontAwesome5 name="crosshairs" color="#17843f" size={15} />
             )}
             <Text style={styles.locationButtonText}>
-              {gettingLocation ? 'Getting location...' : 'Use My Location'}
+              {gettingLocation ? 'Getting location...' : 'Use Current Location'}
             </Text>
           </TouchableOpacity>
           <View style={styles.mapFrame}>
@@ -410,9 +429,7 @@ export default function ReportScreen() {
             {mapLoading ? <View style={styles.mapState}><ActivityIndicator color="#17843f" /><Text style={styles.mapStateText}>Loading map...</Text></View> : null}
             {mapError ? <View style={styles.mapState}><Text style={styles.mapStateText}>Map unavailable. Check your connection.</Text></View> : null}
           </View>
-          {coordinate ? <Text style={styles.coordinates}>{coordinate.latitude.toFixed(6)}, {coordinate.longitude.toFixed(6)}</Text> : null}
-          <Text style={styles.label}>Location / Barangay (optional)</Text>
-          <TextInput style={styles.input} value={location} onChangeText={setLocation} maxLength={255} placeholder="Enter location or barangay" />
+          {coordinate ? <Text style={styles.coordinates}>✓ GPS location attached · {coordinate.latitude.toFixed(6)}, {coordinate.longitude.toFixed(6)}</Text> : null}
           <Text style={styles.label}>Describe the issue</Text>
           <TextInput style={[styles.input, styles.textarea]} value={description} onChangeText={setDescription} maxLength={1000} multiline textAlignVertical="top" placeholder="Describe the community concern" />
           {photo ? (
@@ -436,7 +453,7 @@ export default function ReportScreen() {
         {loading ? <ActivityIndicator color="#17843f" size="large" /> : null}
         {error ? <View style={styles.stateCard}><Text style={styles.stateText}>{error}</Text></View> : null}
         {!loading && !error && reports.length === 0 ? <View style={styles.stateCard}><Text style={styles.stateText}>No reports yet.</Text></View> : null}
-        {reports.map((report) => <ReportCard key={report.id} report={report} onReportUpdate={updateReport} currentUserId={currentUserId} />)}
+        {reports.map((report) => <ReportCard key={report.id} report={report} onReportUpdate={updateReport} currentUserId={currentUserId} onViewDetails={(reportId) => router.push({ pathname: '/tabs/report-details', params: { id: reportId } })} />)}
         {page < lastPage ? <TouchableOpacity style={styles.moreButton} onPress={() => loadReports({ nextPage: page + 1 })} disabled={loadingMore}><Text style={styles.moreText}>{loadingMore ? 'Loading...' : 'Load More'}</Text></TouchableOpacity> : null}
       </ScrollView>
     </KeyboardAvoidingView>
@@ -450,5 +467,5 @@ const styles = StyleSheet.create({
   locationButton: { minHeight: 38, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: '#b9ddc4', borderRadius: 10, backgroundColor: '#f2faf4', paddingHorizontal: 12, paddingVertical: 8, marginBottom: 10 }, locationButtonText: { color: '#17843f', fontSize: 13, fontWeight: '700' },
   mapFrame: { width: '100%', height: 230, borderRadius: 12, overflow: 'hidden', backgroundColor: '#e8eee9', marginBottom: 8 }, map: { flex: 1, backgroundColor: '#e8eee9' }, mapState: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#e8eee9' }, mapStateText: { color: '#52665a', fontSize: 12 }, coordinates: { color: '#667085', fontSize: 12, marginBottom: 16 }, input: { minHeight: 48, borderWidth: 1, borderColor: '#d1d5db', borderRadius: 10, paddingHorizontal: 12, fontSize: 15, color: '#111827', marginBottom: 16 }, textarea: { height: 120, paddingTop: 12 },
   photoPreviewWrap: { marginBottom: 12 }, preview: { width: '100%', height: 200, borderRadius: 12 }, removePhotoButton: { minHeight: 40, alignSelf: 'flex-end', flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 9, marginTop: 4 }, removePhotoText: { color: '#9a3412', fontSize: 12, fontWeight: '700' }, photoButton: { minHeight: 48, borderWidth: 1, borderColor: '#17843f', borderRadius: 10, flexDirection: 'row', gap: 9, alignItems: 'center', justifyContent: 'center' }, photoButtonText: { color: '#17843f', fontWeight: '700' }, submitButton: { minHeight: 50, borderRadius: 10, backgroundColor: '#17843f', alignItems: 'center', justifyContent: 'center', marginTop: 12 }, submitText: { color: '#fff', fontWeight: '800', fontSize: 15 }, disabled: { opacity: 0.6 },
-  feedTitle: { fontSize: 21, fontWeight: '800', color: '#111827', marginBottom: 14 }, reportCard: { backgroundColor: '#fff', padding: 16, borderRadius: 16, borderWidth: 1, borderColor: '#e5e9e7', marginBottom: 14 }, reportHeader: { flexDirection: 'row', alignItems: 'center' }, avatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#17843f', alignItems: 'center', justifyContent: 'center' }, avatarText: { color: '#fff', fontSize: 16, fontWeight: '800' }, authorInfo: { flex: 1, marginLeft: 10 }, author: { fontSize: 15, fontWeight: '700', color: '#111827' }, date: { fontSize: 11, color: '#8a9390', marginTop: 3 }, badge: { paddingHorizontal: 9, paddingVertical: 5, borderRadius: 16 }, badgeText: { fontSize: 11, fontWeight: '700', textTransform: 'capitalize' }, description: { fontSize: 14, lineHeight: 21, color: '#374151', marginTop: 14 }, location: { fontSize: 13, color: '#667085', marginTop: 9 }, reportImage: { width: '100%', height: 210, borderRadius: 12, marginTop: 12 }, counts: { flexDirection: 'row', gap: 22, marginTop: 13 }, count: { color: '#667085', fontSize: 14 }, stateCard: { padding: 20, backgroundColor: '#fff', borderRadius: 14, alignItems: 'center', marginBottom: 14 }, stateText: { color: '#667085', textAlign: 'center' }, moreButton: { minHeight: 46, alignItems: 'center', justifyContent: 'center' }, moreText: { color: '#17843f', fontWeight: '700' },
+  feedTitle: { fontSize: 21, fontWeight: '800', color: '#111827', marginBottom: 14 }, reportCard: { backgroundColor: '#fff', padding: 16, borderRadius: 16, borderWidth: 1, borderColor: '#e5e9e7', marginBottom: 14 }, reportHeader: { flexDirection: 'row', alignItems: 'center' }, avatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#17843f', alignItems: 'center', justifyContent: 'center' }, avatarText: { color: '#fff', fontSize: 16, fontWeight: '800' }, authorInfo: { flex: 1, marginLeft: 10 }, author: { fontSize: 15, fontWeight: '700', color: '#111827' }, date: { fontSize: 11, color: '#8a9390', marginTop: 3 }, badge: { paddingHorizontal: 9, paddingVertical: 5, borderRadius: 16 }, badgeText: { fontSize: 11, fontWeight: '700', textTransform: 'capitalize' }, description: { fontSize: 14, lineHeight: 21, color: '#374151', marginTop: 14 }, location: { fontSize: 13, color: '#667085', marginTop: 9 }, reportImage: { width: '100%', height: 210, borderRadius: 12, marginTop: 12 }, detailsButton: { minHeight: 38, alignSelf: 'flex-end', flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 10, paddingHorizontal: 10 }, detailsButtonText: { color: '#17843f', fontSize: 12, fontWeight: '700' }, counts: { flexDirection: 'row', gap: 22, marginTop: 13 }, count: { color: '#667085', fontSize: 14 }, stateCard: { padding: 20, backgroundColor: '#fff', borderRadius: 14, alignItems: 'center', marginBottom: 14 }, stateText: { color: '#667085', textAlign: 'center' }, moreButton: { minHeight: 46, alignItems: 'center', justifyContent: 'center' }, moreText: { color: '#17843f', fontWeight: '700' },
 });

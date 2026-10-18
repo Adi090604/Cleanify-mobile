@@ -10,6 +10,7 @@ import ReportInteractions from '../../../src/components/ReportInteractions';
 
 const STATUS_STYLES = {
   pending: { backgroundColor: '#fff4d6', color: '#c47a00' },
+  in_progress: { backgroundColor: '#dbeafe', color: '#1d4ed8' },
   resolved: { backgroundColor: '#dcfce7', color: '#15803d' },
   rejected: { backgroundColor: '#fee2e2', color: '#b91c1c' },
 };
@@ -20,7 +21,7 @@ function MyPost({ report, onReportUpdate, currentUserId }) {
     <View style={styles.postCard}>
       <View style={styles.postTop}>
         <Text style={styles.postDate}>{new Date(report.created_at).toLocaleString()}</Text>
-        <View style={[styles.badge, { backgroundColor: badge.backgroundColor }]}><Text style={[styles.badgeText, { color: badge.color }]}>{report.status}</Text></View>
+        <View style={[styles.badge, { backgroundColor: badge.backgroundColor }]}><Text style={[styles.badgeText, { color: badge.color }]}>{report.status.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase())}</Text></View>
       </View>
       <Text style={styles.description}>{report.description}</Text>
       {report.location ? <Text style={styles.location}><FontAwesome5 name="map-marker-alt" /> {report.location}</Text> : null}

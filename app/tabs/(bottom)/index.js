@@ -18,6 +18,7 @@ import ReportInteractions from '../../../src/components/ReportInteractions';
 
 const STATUS_STYLES = {
   pending: { backgroundColor: '#fff4d6', color: '#c47a00' },
+  in_progress: { backgroundColor: '#dbeafe', color: '#1d4ed8' },
   resolved: { backgroundColor: '#dcfce7', color: '#15803d' },
   rejected: { backgroundColor: '#fee2e2', color: '#b91c1c' },
 };
@@ -49,7 +50,7 @@ function ReportCard({ report, onReportUpdate, currentUserId }) {
         </View>
         <View style={[styles.statusBadge, { backgroundColor: badge.backgroundColor }]}>
           <Text style={[styles.statusText, { color: badge.color }]}>
-            {report.status.charAt(0).toUpperCase() + report.status.slice(1)}
+            {report.status.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase())}
           </Text>
         </View>
       </View>

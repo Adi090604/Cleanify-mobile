@@ -9,9 +9,15 @@ import { api, clearAuthToken } from '../../../src/api/client';
 const REFRESH_INTERVAL = 30_000;
 const DEFAULT_CENTER = { latitude: 9.787, longitude: 125.4928 };
 const hasValidCoordinates = (item) => {
+  if (item?.latitude == null || item?.latitude === '' || item?.longitude == null || item?.longitude === '') return false;
   const latitude = Number(item?.latitude);
   const longitude = Number(item?.longitude);
   return Number.isFinite(latitude) && Number.isFinite(longitude) && latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180;
+};
+const formatCoverageRadius = (value) => {
+  const radius = Number(value);
+  if (!Number.isFinite(radius) || radius <= 0) return 'Not configured';
+  return radius >= 1000 ? `${Number((radius / 1000).toFixed(1))} km` : `${radius} m`;
 };
 const MAP_HTML = `<!DOCTYPE html><html><head>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
@@ -29,34 +35,38 @@ const MAP_HTML = `<!DOCTYPE html><html><head>
 document.addEventListener('DOMContentLoaded',function(){
  try {
   if(!window.L)throw new Error('Leaflet is unavailable');
-  var map=L.map('map').setView([9.7870,125.4928],13),markers={},zones={},selectedTruckId=null,initialized=false;
+  if(window.cleanifyMapInitialized)return;window.cleanifyMapInitialized=true;
+  var map=window.cleanifyMap=L.map('map').setView([9.7870,125.4928],13),markers={},selectedTruckId=null,initialized=false;
   var cluster=typeof L.markerClusterGroup==='function'?L.markerClusterGroup({showCoverageOnHover:false}):L.layerGroup();
   cluster.addTo(map);
+  var coverageLayer=window.cleanifyCoverageCircleLayer=L.layerGroup().addTo(map);window.cleanifyTruckCircles=window.cleanifyTruckCircles||{};var coverageCircles=window.cleanifyTruckCircles;
   var colors={active:'#17843f',on_break:'#d99a08',offline:'#dc2626',maintenance:'#2563eb'};
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>',maxZoom:19}).addTo(map);
   function valid(lat,lng){return Number.isFinite(lat)&&Number.isFinite(lng)&&lat>=-90&&lat<=90&&lng>=-180&&lng<=180;}
   function icon(status,selected){var color=colors[status]||'#6b7280';return L.divIcon({className:'',html:'<div class="pin'+(selected?' selected':'')+'" style="background:'+color+'"><span>&#128666;</span></div>',iconSize:[30,30],iconAnchor:[15,30]});}
   function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,function(char){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[char];});}
   function formatLastUpdated(value){if(!value)return'Never';var date=new Date(value);if(Number.isNaN(date.getTime()))return'Never';return date.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})+' &bull; '+date.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});}
-  function popupContent(truck){return'<div class="truck-popup"><div class="truck-popup-head"><span class="truck-popup-code">'+escapeHtml(truck.code||'Truck')+'</span><span class="truck-popup-status">'+escapeHtml(truck.formatted_status||truck.status||'Unknown')+'</span></div><div class="truck-popup-row"><strong>Driver:</strong> '+escapeHtml(truck.driver||'No driver assigned')+'</div><div class="truck-popup-row"><strong>Route:</strong> '+escapeHtml(truck.route||'No route assigned')+'</div><div class="truck-popup-time"><strong>Last updated:</strong> '+formatLastUpdated(truck.last_updated)+'</div></div>';}
+  function formatRadius(value){var radius=Number(value);if(!Number.isFinite(radius)||radius<=0)return'Not configured';return radius>=1000?Number((radius/1000).toFixed(1))+' km':radius+' m';}
+  function popupContent(truck){return'<div class="truck-popup"><div class="truck-popup-head"><span class="truck-popup-code">'+escapeHtml(truck.code||'Truck')+'</span><span class="truck-popup-status">'+escapeHtml(truck.formatted_status||truck.status||'Unknown')+'</span></div><div class="truck-popup-row"><strong>Driver:</strong> '+escapeHtml(truck.driver||'No driver assigned')+'</div><div class="truck-popup-row"><strong>Route:</strong> '+escapeHtml(truck.route||'No route assigned')+'</div><div class="truck-popup-row"><strong>Coverage Radius:</strong> '+formatRadius(truck.coverage_radius_meters)+'</div><div class="truck-popup-time"><strong>Last updated:</strong> '+formatLastUpdated(truck.last_updated)+'</div></div>';}
+  function removeCoverageCircle(id){if(!coverageCircles[id])return;coverageLayer.removeLayer(coverageCircles[id]);delete coverageCircles[id];}
+  function resetCoverageCircles(){coverageLayer.clearLayers();Object.keys(coverageCircles).forEach(function(id){delete coverageCircles[id];});}
+  function upsertCoverageCircle(truck,lat,lng){var radius=Number(truck.coverage_radius_meters);if(!Number.isFinite(radius)||radius<=0){removeCoverageCircle(truck.id);return;}coverageCircles[truck.id]=L.circle([lat,lng],{radius:radius,color:'#16a34a',fillColor:'#22c55e',fillOpacity:0.08,opacity:0.55,weight:1.5,interactive:false}).addTo(coverageLayer);}
   function selectMarker(id,openPopup){selectedTruckId=id;map.closePopup();Object.keys(markers).forEach(function(markerId){var marker=markers[markerId];marker.setIcon(icon(marker.truckStatus,String(markerId)===String(id)));});if(openPopup&&markers[id])markers[id].openPopup();}
   window.updateTrucks=function(payload){
-   var seen={};(payload.trucks||[]).forEach(function(truck){var lat=Number(truck.latitude),lng=Number(truck.longitude);if(!valid(lat,lng))return;
+   resetCoverageCircles();var seen={};(payload.trucks||[]).forEach(function(truck){var lat=Number(truck.latitude),lng=Number(truck.longitude);if(!valid(lat,lng))return;
     seen[truck.id]=true;if(markers[truck.id])markers[truck.id].setLatLng([lat,lng]).setIcon(icon(truck.status,String(truck.id)===String(selectedTruckId)));else{markers[truck.id]=L.marker([lat,lng],{icon:icon(truck.status,String(truck.id)===String(selectedTruckId))});markers[truck.id].on('click',function(){selectMarker(truck.id,true);post({type:'marker_selected',truckId:truck.id});});cluster.addLayer(markers[truck.id]);}markers[truck.id].truckStatus=truck.status;
     if(markers[truck.id].getPopup())markers[truck.id].setPopupContent(popupContent(truck));else markers[truck.id].bindPopup(popupContent(truck),{maxWidth:220,closeButton:true,autoPan:true});
-   });Object.keys(markers).forEach(function(id){if(!seen[id]){cluster.removeLayer(markers[id]);delete markers[id];}});
+    upsertCoverageCircle(truck,lat,lng);
+   });Object.keys(markers).forEach(function(id){if(!seen[id]){cluster.removeLayer(markers[id]);delete markers[id];}});Object.keys(coverageCircles).forEach(function(id){if(!seen[id])removeCoverageCircle(id);});
    var center=payload.center||{};var centerLat=Number(center.latitude),centerLng=Number(center.longitude);if(!initialized&&valid(centerLat,centerLng)){map.setView([centerLat,centerLng],Number(payload.zoom)||13);initialized=true;}
   };
-  window.updateZones=function(items,selected){var seen={};(items||[]).forEach(function(zone,index){var lat=Number(zone.latitude),lng=Number(zone.longitude);if(!valid(lat,lng))return;
-   seen[zone.id]=true;var color='hsl('+((index*60)%360)+',70%,45%)';if(!zones[zone.id])zones[zone.id]=L.circle([lat,lng],{radius:600,color:color,fillColor:color,weight:1}).addTo(map);
-   var active=String(zone.id)===String(selected);zones[zone.id].setStyle({fillOpacity:active ? 0.3 : 0.1,opacity:active ? 0.6 : 0.3});
-  });Object.keys(zones).forEach(function(id){if(!seen[id]){map.removeLayer(zones[id]);delete zones[id];}});if(selected&&zones[selected])map.setView(zones[selected].getLatLng(),14);};
   window.selectTruck=function(id){selectMarker(id,false);};
   window.focusTruck=function(id){if(markers[id]){selectMarker(id,false);map.setView(markers[id].getLatLng(),15);markers[id].openPopup();post({type:'focus_result',truckId:id,success:true});}else post({type:'focus_result',truckId:id,success:false});};
   setTimeout(function(){map.invalidateSize();post({type:'map_ready'});},0);
  } catch(error){mapError(error&&error.message?error.message:error);}
 });
 </script></body></html>`;
+const MAP_SOURCE = Object.freeze({ html: MAP_HTML, baseUrl: 'https://localhost/' });
 
 const STATUS_COLORS = {
   active: { background: '#dcfce7', text: '#15803d' },
@@ -69,8 +79,6 @@ export default function TrackerScreen() {
   const router = useRouter();
   const webView = useRef(null);
   const [trucks, setTrucks] = useState([]);
-  const [zones, setZones] = useState([]);
-  const [selectedZone, setSelectedZone] = useState(null);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('all');
   const [countdown, setCountdown] = useState(30);
@@ -90,7 +98,6 @@ export default function TrackerScreen() {
     try {
       const { data } = await api.get('/trucks');
       setTrucks(Array.isArray(data.trucks) ? data.trucks : []);
-      setZones(Array.isArray(data.zones) ? data.zones : []);
       setMapConfig({ center: data.map?.center ?? DEFAULT_CENTER, zoom: data.map?.zoom ?? 13 });
     } catch (requestError) {
       if (requestError.response?.status === 401) {
@@ -118,11 +125,9 @@ export default function TrackerScreen() {
   useEffect(() => {
     if (!mapReady) return;
     const validTrucks = trucks.filter(hasValidCoordinates).map((truck) => ({ ...truck, latitude: Number(truck.latitude), longitude: Number(truck.longitude) }));
-    const validZones = zones.filter(hasValidCoordinates).map((zone) => ({ ...zone, latitude: Number(zone.latitude), longitude: Number(zone.longitude) }));
     const center = hasValidCoordinates(mapConfig.center) ? mapConfig.center : DEFAULT_CENTER;
     webView.current?.injectJavaScript(`window.updateTrucks(${JSON.stringify({ trucks: validTrucks, center, zoom: mapConfig.zoom })});true;`);
-    webView.current?.injectJavaScript(`window.updateZones(${JSON.stringify(validZones)},${JSON.stringify(selectedZone)});true;`);
-  }, [mapReady, mapConfig, selectedZone, trucks, zones]);
+  }, [mapReady, mapConfig, trucks]);
 
   useEffect(() => {
     if (mapReady || mapError) return undefined;
@@ -173,13 +178,9 @@ export default function TrackerScreen() {
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
         {['all', ...statuses].map((value) => <TouchableOpacity key={value} style={[styles.chip, status === value && styles.chipActive]} onPress={() => setStatus(value)}><Text style={[styles.chipText, status === value && styles.chipTextActive]}>{value === 'all' ? 'All statuses' : value.replace('_', ' ')}</Text></TouchableOpacity>)}
       </ScrollView>
-      {zones.length ? <><Text style={styles.zoneLabel}>Highlight a service zone</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-        <TouchableOpacity style={[styles.chip, selectedZone == null && styles.chipActive]} onPress={() => setSelectedZone(null)}><Text style={[styles.chipText, selectedZone == null && styles.chipTextActive]}>Clear</Text></TouchableOpacity>
-        {zones.map((zone) => <TouchableOpacity key={zone.id} style={[styles.chip, selectedZone === zone.id && styles.chipActive]} onPress={() => setSelectedZone(zone.id)}><Text style={[styles.chipText, selectedZone === zone.id && styles.chipTextActive]}>{zone.name}</Text></TouchableOpacity>)}
-      </ScrollView></> : null}
       <View style={styles.liveRow}><Text style={styles.liveText}>● Live updating · Refresh in {countdown}s</Text><TouchableOpacity onPress={() => loadTrucks({ refresh: true })}><Text style={styles.refreshButton}>Refresh now</Text></TouchableOpacity></View>
       <View style={styles.mapFrame}>
-        <WebView key={mapKey} ref={webView} style={styles.map} source={{ html: MAP_HTML, baseUrl: 'https://localhost/' }} originWhitelist={['https://*']} javaScriptEnabled domStorageEnabled nestedScrollEnabled
+        <WebView key={mapKey} ref={webView} style={styles.map} source={MAP_SOURCE} originWhitelist={['https://*']} javaScriptEnabled domStorageEnabled nestedScrollEnabled
           onMessage={handleMapMessage}
           onError={(event) => { setMapReady(false); setMapError(event.nativeEvent.description || 'The map WebView could not load.'); }} />
         {!mapReady && !mapError ? <View style={styles.mapState}><ActivityIndicator color="#17843f" /><Text style={styles.mapStateText}>Loading map...</Text></View> : null}
@@ -189,6 +190,7 @@ export default function TrackerScreen() {
         <View style={styles.detailHeader}><View><Text style={styles.detailEyebrow}>SELECTED TRUCK</Text><Text style={styles.detailCode}>{selectedTruck.code}</Text></View><View style={[styles.badge, { backgroundColor: (STATUS_COLORS[selectedTruck.status] ?? {}).background || '#f3f4f6' }]}><Text style={[styles.badgeText, { color: (STATUS_COLORS[selectedTruck.status] ?? {}).text || '#4b5563' }]}>{selectedTruck.formatted_status}</Text></View></View>
         <Text style={styles.detailLine}><Text style={styles.detailLabel}>Driver: </Text>{selectedTruck.driver || 'No driver assigned'}</Text>
         <Text style={styles.detailLine}><Text style={styles.detailLabel}>Route: </Text>{selectedTruck.route || 'No route assigned'}</Text>
+        <Text style={styles.detailLine}><Text style={styles.detailLabel}>Coverage Radius: </Text>{formatCoverageRadius(selectedTruck.coverage_radius_meters)}</Text>
         <Text style={styles.detailLine}><Text style={styles.detailLabel}>Last update: </Text>{selectedTruck.last_updated_human || 'Never'}</Text>
         {hasValidCoordinates(selectedTruck) ? <Text style={styles.detailCoordinates}>{Number(selectedTruck.latitude).toFixed(6)}, {Number(selectedTruck.longitude).toFixed(6)}</Text> : <Text style={styles.noLocation}>No live location</Text>}
         {mapNotice ? <Text style={styles.mapNotice}>{mapNotice}</Text> : null}
@@ -224,7 +226,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f6f8f7' }, content: { paddingHorizontal: 18, paddingTop: 24, paddingBottom: 100 },
   title: { fontSize: 28, fontWeight: '800', color: '#111827' }, subtitle: { marginTop: 7, marginBottom: 18, fontSize: 15, lineHeight: 21, color: '#667085' },
   summary: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderRadius: 16, borderWidth: 1, borderColor: '#d7eadc', backgroundColor: '#fff', marginBottom: 14 }, summaryLabel: { color: '#667085', fontSize: 11, fontWeight: '700', letterSpacing: 0.8 }, summaryCount: { color: '#17843f', fontSize: 28, fontWeight: '800', marginTop: 2 },
-  search: { height: 48, borderWidth: 1, borderColor: '#d1d5db', borderRadius: 24, backgroundColor: '#fff', paddingHorizontal: 16, color: '#111827' }, chips: { gap: 8, paddingVertical: 11 }, chip: { paddingHorizontal: 13, paddingVertical: 8, borderRadius: 18, borderWidth: 1, borderColor: '#d1d5db', backgroundColor: '#fff' }, chipActive: { backgroundColor: '#17843f', borderColor: '#17843f' }, chipText: { color: '#59635e', fontSize: 12, textTransform: 'capitalize' }, chipTextActive: { color: '#fff', fontWeight: '700' }, zoneLabel: { color: '#374151', fontSize: 13, fontWeight: '700', marginTop: 4 },
+  search: { height: 48, borderWidth: 1, borderColor: '#d1d5db', borderRadius: 24, backgroundColor: '#fff', paddingHorizontal: 16, color: '#111827' }, chips: { gap: 8, paddingVertical: 11 }, chip: { paddingHorizontal: 13, paddingVertical: 8, borderRadius: 18, borderWidth: 1, borderColor: '#d1d5db', backgroundColor: '#fff' }, chipActive: { backgroundColor: '#17843f', borderColor: '#17843f' }, chipText: { color: '#59635e', fontSize: 12, textTransform: 'capitalize' }, chipTextActive: { color: '#fff', fontWeight: '700' },
   liveRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4, marginBottom: 10 }, liveText: { color: '#17843f', fontSize: 12 }, refreshButton: { color: '#17843f', fontSize: 12, fontWeight: '700' },
   mapFrame: { height: 260, borderRadius: 16, overflow: 'hidden', backgroundColor: '#e8eee9', borderWidth: 1, borderColor: '#dce4df', marginBottom: 24 }, map: { flex: 1, backgroundColor: '#e8eee9' },
   mapState: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#e8eee9' }, mapStateText: { color: '#52665a', fontSize: 13, textAlign: 'center', paddingHorizontal: 20 },

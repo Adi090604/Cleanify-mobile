@@ -496,9 +496,10 @@ export default function SettingsScreen() {
     const address = requestForm.address.trim();
     const details = requestForm.details.trim();
 
-    if (!areaName) errors.area_name = 'Area / Purok is required.';
-    else if (areaName.length > 255) errors.area_name = 'Area / Purok must be 255 characters or fewer.';
-    if (barangay.length > 255) errors.barangay = 'Barangay must be 255 characters or fewer.';
+    if (!areaName) errors.area_name = 'Area / Purok / Sitio is required.';
+    else if (areaName.length > 255) errors.area_name = 'Area / Purok / Sitio must be 255 characters or fewer.';
+    if (!barangay) errors.barangay = 'Barangay is required.';
+    else if (barangay.length > 255) errors.barangay = 'Barangay must be 255 characters or fewer.';
     if (address.length > 255) errors.address = 'Address / Landmark must be 255 characters or fewer.';
     if (details.length > 2000) errors.details = 'Additional Details must be 2,000 characters or fewer.';
 
@@ -515,7 +516,7 @@ export default function SettingsScreen() {
 
     const payload = {
       area_name: requestForm.area_name.trim(),
-      barangay: requestForm.barangay.trim() || null,
+      barangay: requestForm.barangay.trim(),
       address: requestForm.address.trim() || null,
       latitude: coordinate?.latitude ?? null,
       longitude: coordinate?.longitude ?? null,
@@ -609,8 +610,10 @@ export default function SettingsScreen() {
                     <Text style={[styles.requestBadgeText, { color: status.text }]}>{status.label}</Text>
                   </View>
                 </View>
-                <Text style={styles.requestAreaLabel}>Area</Text>
+                <Text style={styles.requestAreaLabel}>Area / Purok / Sitio</Text>
                 <Text style={styles.requestAreaValue}>{latestRequest.area_name}</Text>
+                <Text style={styles.requestAreaLabel}>Barangay</Text>
+                <Text style={styles.requestAreaValue}>{latestRequest.barangay || 'Not provided'}</Text>
                 {latestRequest.status === 'pending' ? (
                   <Text style={styles.requestMessage}>Your request has been submitted and is waiting for review.</Text>
                 ) : null}
@@ -631,18 +634,18 @@ export default function SettingsScreen() {
           })() : null}
 
           <TouchableOpacity
-            style={[styles.areaRequestButton, latestRequest?.status === 'pending' && styles.areaRequestButtonDisabled]}
+            style={styles.areaRequestButton}
             onPress={openRequestModal}
-            disabled={requestLoading || latestRequest?.status === 'pending'}
+            disabled={requestLoading}
             accessibilityRole="button"
-            accessibilityState={{ disabled: requestLoading || latestRequest?.status === 'pending' }}
+            accessibilityState={{ disabled: requestLoading }}
           >
             <View style={styles.areaRequestButtonIcon}>
               <FontAwesome5 name="map-marked-alt" size={15} color="#17843f" />
             </View>
             <View style={styles.areaRequestButtonCopy}>
-              <Text style={styles.areaRequestButtonTitle}>{latestRequest?.status === 'pending' ? 'Request pending review' : 'My area is not listed'}</Text>
-              <Text style={styles.areaRequestButtonText}>{latestRequest?.status === 'pending' ? 'You can submit again after this request is reviewed.' : 'Ask Cleanify to review service coverage for your area.'}</Text>
+              <Text style={styles.areaRequestButtonTitle}>My area is not listed</Text>
+              <Text style={styles.areaRequestButtonText}>Ask Cleanify to review service coverage for another area and Barangay.</Text>
             </View>
             <FontAwesome5 name="chevron-right" size={12} color="#88928d" />
           </TouchableOpacity>
@@ -703,22 +706,22 @@ export default function SettingsScreen() {
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
             >
-              <Text style={styles.label}>Area / Purok *</Text>
+              <Text style={styles.label}>Area / Purok / Sitio *</Text>
               <TextInput
                 style={[styles.input, requestFormErrors.area_name && styles.inputError]}
                 value={requestForm.area_name}
                 onChangeText={(value) => updateRequestField('area_name', value)}
-                placeholder="e.g. Sitio Riverside"
+                placeholder="e.g. Purok 1, Don Julio, Espina Extension"
                 maxLength={255}
               />
               <FieldError value={requestFormErrors.area_name} />
 
-              <Text style={styles.label}>Barangay</Text>
+              <Text style={styles.label}>Barangay *</Text>
               <TextInput
                 style={[styles.input, requestFormErrors.barangay && styles.inputError]}
                 value={requestForm.barangay}
                 onChangeText={(value) => updateRequestField('barangay', value)}
-                placeholder="Barangay name"
+                placeholder="e.g. Canlanipa"
                 maxLength={255}
               />
               <FieldError value={requestFormErrors.barangay} />
@@ -728,7 +731,7 @@ export default function SettingsScreen() {
                 style={[styles.input, requestFormErrors.address && styles.inputError]}
                 value={requestForm.address}
                 onChangeText={(value) => updateRequestField('address', value)}
-                placeholder="Street, landmark, or nearby place"
+                placeholder="e.g. Near covered court"
                 maxLength={255}
               />
               <FieldError value={requestFormErrors.address} />
@@ -810,7 +813,7 @@ export default function SettingsScreen() {
                 style={[styles.input, styles.detailsInput, requestFormErrors.details && styles.inputError]}
                 value={requestForm.details}
                 onChangeText={(value) => updateRequestField('details', value)}
-                placeholder="Share any useful coverage details"
+                placeholder="Optional notes"
                 multiline
                 textAlignVertical="top"
                 maxLength={2000}

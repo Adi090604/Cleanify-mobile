@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 
 import { api, clearAuthToken } from '../../../src/api/client';
+import ReportAuthorAvatar from '../../../src/components/ReportAuthorAvatar';
 import ReportInteractions from '../../../src/components/ReportInteractions';
 
 const STATUS_STYLES = {
@@ -41,9 +42,7 @@ function ReportCard({ report, onReportUpdate, currentUserId }) {
   return (
     <View style={styles.reportCard}>
       <View style={styles.reportHeader}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{report.author.initial}</Text>
-        </View>
+        <ReportAuthorAvatar author={report.author} style={styles.avatar} textStyle={styles.avatarText} />
         <View style={styles.reportUserInfo}>
           <Text style={styles.reportUser} numberOfLines={1}>{report.author.name}</Text>
           <Text style={styles.reportTime}>{reportTime(report.created_at)}</Text>

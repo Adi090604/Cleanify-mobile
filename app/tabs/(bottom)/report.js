@@ -8,6 +8,7 @@ import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, RefreshContro
 
 import { api, clearAuthToken } from '../../../src/api/client';
 import { useCleanifyAlert } from '../../../src/components/CleanifyAlert';
+import ReportAuthorAvatar from '../../../src/components/ReportAuthorAvatar';
 import ReportInteractions from '../../../src/components/ReportInteractions';
 
 const LEAFLET_MAP_HTML = `<!DOCTYPE html>
@@ -131,7 +132,7 @@ function ReportCard({ report, onReportUpdate, currentUserId, onViewDetails }) {
   return (
     <View style={styles.reportCard}>
       <View style={styles.reportHeader}>
-        <View style={styles.avatar}><Text style={styles.avatarText}>{report.author.initial}</Text></View>
+        <ReportAuthorAvatar author={report.author} style={styles.avatar} textStyle={styles.avatarText} />
         <View style={styles.authorInfo}>
           <Text style={styles.author}>{report.author.name}</Text>
           <Text style={styles.date}>{new Date(report.created_at).toLocaleString()}</Text>

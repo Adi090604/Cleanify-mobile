@@ -6,6 +6,7 @@ import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacit
 
 import { api, clearAuthToken } from '../../../src/api/client';
 import { useCleanifyAlert } from '../../../src/components/CleanifyAlert';
+import ReportAuthorAvatar from '../../../src/components/ReportAuthorAvatar';
 import ReportInteractions from '../../../src/components/ReportInteractions';
 
 const STATUS_STYLES = {
@@ -105,7 +106,7 @@ export default function ReportDetailsScreen() {
 
       <View style={styles.card}>
         <View style={styles.header}>
-          <View style={styles.avatar}><Text style={styles.avatarText}>{report.author?.initial || 'C'}</Text></View>
+          <ReportAuthorAvatar author={report.author} style={styles.avatar} textStyle={styles.avatarText} />
           <View style={styles.authorInfo}>
             <Text style={styles.author}>{report.author?.name || 'Cleanify User'}</Text>
             <Text style={styles.date}>{new Date(report.created_at).toLocaleString()}</Text>

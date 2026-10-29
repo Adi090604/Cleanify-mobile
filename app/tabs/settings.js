@@ -163,7 +163,7 @@ function Section({ title, children }) {
   );
 }
 
-function PreferenceRow({ label, value, onValueChange, unavailable = false }) {
+function PreferenceRow({ label, value, onValueChange, unavailable = false, disabled = false }) {
   return (
     <View style={styles.preferenceRow}>
       <Text style={styles.preferenceLabel}>{label}</Text>
@@ -173,6 +173,8 @@ function PreferenceRow({ label, value, onValueChange, unavailable = false }) {
         <Switch
           value={value}
           onValueChange={onValueChange}
+          disabled={disabled}
+          accessibilityLabel={label}
           trackColor={{ false: '#d1d5db', true: '#86d39d' }}
           thumbColor={value ? '#17843f' : '#f4f4f5'}
         />
@@ -191,6 +193,7 @@ export default function SettingsScreen() {
   const { showAlert } = useCleanifyAlert();
   const submissionInFlight = useRef(false);
   const notificationSaveInFlight = useRef(false);
+  const persistedNotifications = useRef(null);
   const locationMapRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -232,13 +235,16 @@ export default function SettingsScreen() {
       setServiceArea(data.account.service_area || '');
       setOfficialServiceArea(data.account.service_area || '');
       setServiceAreas(data.service_areas || []);
-      setNotifications({
+      const loadedNotifications = {
         email_notifications: data.notifications.email_notifications,
         sms_notifications: data.notifications.sms_notifications,
         report_updates: data.notifications.report_updates,
         schedule_reminders: data.notifications.schedule_reminders,
+        system: data.notifications.system,
         push_available: data.notifications.push_available,
-      });
+      };
+      persistedNotifications.current = loadedNotifications;
+      setNotifications(loadedNotifications);
     } catch (error) {
       if (error.response?.status === 401) {
         await clearAuthToken();
@@ -333,10 +339,15 @@ export default function SettingsScreen() {
         sms_notifications: notifications.sms_notifications,
         report_updates: notifications.report_updates,
         schedule_reminders: notifications.schedule_reminders,
+        system: notifications.system,
       });
+      persistedNotifications.current = { ...notifications };
       showAlert({ type: 'success', title: 'Preferences Saved', message: 'Notification preferences updated successfully.', confirmText: 'Done' });
       await loadSettings();
     } catch (error) {
+      if (persistedNotifications.current) {
+        setNotifications({ ...persistedNotifications.current });
+      }
       showAlert({ type: 'error', title: 'Unable to Save Preferences', message: messageFor(error) });
     } finally {
       notificationSaveInFlight.current = false;
@@ -666,12 +677,13 @@ export default function SettingsScreen() {
 
         <Section title="Notification Preferences">
           <Text style={styles.subheading}>Global Settings</Text>
-          <PreferenceRow label="Email Notifications" value={notifications.email_notifications} onValueChange={(value) => setNotificationPreference('email_notifications', value)} />
-          <PreferenceRow label="SMS Notifications" value={notifications.sms_notifications} onValueChange={(value) => setNotificationPreference('sms_notifications', value)} />
+          <PreferenceRow label="Email Notifications" value={notifications.email_notifications} onValueChange={(value) => setNotificationPreference('email_notifications', value)} disabled={saving !== null} />
+          <PreferenceRow label="SMS Notifications" value={notifications.sms_notifications} onValueChange={(value) => setNotificationPreference('sms_notifications', value)} disabled={saving !== null} />
           {notifications.push_available === false ? <PreferenceRow label="Push Notifications" unavailable /> : null}
           <Text style={styles.subheading}>Notification Categories</Text>
-          <PreferenceRow label="Report Updates" value={notifications.report_updates} onValueChange={(value) => setNotificationPreference('report_updates', value)} />
-          <PreferenceRow label="Schedule Reminders" value={notifications.schedule_reminders} onValueChange={(value) => setNotificationPreference('schedule_reminders', value)} />
+          <PreferenceRow label="Report Updates" value={notifications.report_updates} onValueChange={(value) => setNotificationPreference('report_updates', value)} disabled={saving !== null} />
+          <PreferenceRow label="Schedule Reminders" value={notifications.schedule_reminders} onValueChange={(value) => setNotificationPreference('schedule_reminders', value)} disabled={saving !== null} />
+          <PreferenceRow label="System" value={notifications.system} onValueChange={(value) => setNotificationPreference('system', value)} disabled={saving !== null} />
           <TouchableOpacity style={styles.button} onPress={saveNotifications} disabled={saving !== null}>
             <Text style={styles.buttonText}>{saving === 'notifications' ? 'Saving...' : 'Save Preferences'}</Text>
           </TouchableOpacity>

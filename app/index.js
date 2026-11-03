@@ -61,7 +61,7 @@ export default function LandingScreen() {
         <Text style={styles.eyebrow}>Smarter community waste management</Text>
         <Text style={styles.title}>A cleaner community starts with clear action.</Text>
         <Text style={styles.description}>
-          Report concerns, follow collection schedules, and stay connected with your community.
+          Cleanify helps residents report concerns, follow collection schedules, and stay connected with their community.
         </Text>
         {sessionError ? <Text style={styles.sessionError}>{sessionError}</Text> : null}
 

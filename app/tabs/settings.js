@@ -163,22 +163,18 @@ function Section({ title, children }) {
   );
 }
 
-function PreferenceRow({ label, value, onValueChange, unavailable = false, disabled = false }) {
+function PreferenceRow({ label, value, onValueChange, disabled = false }) {
   return (
     <View style={styles.preferenceRow}>
       <Text style={styles.preferenceLabel}>{label}</Text>
-      {unavailable ? (
-        <Text style={styles.preferenceUnavailable}>Unavailable</Text>
-      ) : (
-        <Switch
-          value={value}
-          onValueChange={onValueChange}
-          disabled={disabled}
-          accessibilityLabel={label}
-          trackColor={{ false: '#d1d5db', true: '#86d39d' }}
-          thumbColor={value ? '#17843f' : '#f4f4f5'}
-        />
-      )}
+      <Switch
+        value={value}
+        onValueChange={onValueChange}
+        disabled={disabled}
+        accessibilityLabel={label}
+        trackColor={{ false: '#d1d5db', true: '#86d39d' }}
+        thumbColor={value ? '#17843f' : '#f4f4f5'}
+      />
     </View>
   );
 }
@@ -241,7 +237,6 @@ export default function SettingsScreen() {
         report_updates: data.notifications.report_updates,
         schedule_reminders: data.notifications.schedule_reminders,
         system: data.notifications.system,
-        push_available: data.notifications.push_available,
       };
       persistedNotifications.current = loadedNotifications;
       setNotifications(loadedNotifications);
@@ -679,11 +674,10 @@ export default function SettingsScreen() {
           <Text style={styles.subheading}>Global Settings</Text>
           <PreferenceRow label="Email Notifications" value={notifications.email_notifications} onValueChange={(value) => setNotificationPreference('email_notifications', value)} disabled={saving !== null} />
           <PreferenceRow label="SMS Notifications" value={notifications.sms_notifications} onValueChange={(value) => setNotificationPreference('sms_notifications', value)} disabled={saving !== null} />
-          {notifications.push_available === false ? <PreferenceRow label="Push Notifications" unavailable /> : null}
           <Text style={styles.subheading}>Notification Categories</Text>
           <PreferenceRow label="Report Updates" value={notifications.report_updates} onValueChange={(value) => setNotificationPreference('report_updates', value)} disabled={saving !== null} />
           <PreferenceRow label="Schedule Reminders" value={notifications.schedule_reminders} onValueChange={(value) => setNotificationPreference('schedule_reminders', value)} disabled={saving !== null} />
-          <PreferenceRow label="System" value={notifications.system} onValueChange={(value) => setNotificationPreference('system', value)} disabled={saving !== null} />
+          <PreferenceRow label="System Notifications" value={notifications.system} onValueChange={(value) => setNotificationPreference('system', value)} disabled={saving !== null} />
           <TouchableOpacity style={styles.button} onPress={saveNotifications} disabled={saving !== null}>
             <Text style={styles.buttonText}>{saving === 'notifications' ? 'Saving...' : 'Save Preferences'}</Text>
           </TouchableOpacity>
@@ -870,7 +864,6 @@ const styles = StyleSheet.create({
   help: { color: '#6b7280', fontSize: 12, lineHeight: 18, marginBottom: 14 },
   preferenceRow: { minHeight: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#edf0ee' },
   preferenceLabel: { flex: 1, color: '#374151', fontSize: 14, marginRight: 12 },
-  preferenceUnavailable: { color: '#8a9390', fontSize: 12, fontWeight: '600' },
   button: { minHeight: 48, backgroundColor: '#17843f', borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 16 },
   buttonText: { color: '#ffffff', fontSize: 15, fontWeight: '800' },
   currentAreaLabel: { color: '#7b8580', fontSize: 10, fontWeight: '800', letterSpacing: 0.8, marginBottom: 8 },

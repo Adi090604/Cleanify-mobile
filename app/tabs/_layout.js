@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter } from 'expo-router';
-import { Drawer, DrawerContentScrollView, DrawerItem, useDrawerStatus } from 'expo-router/drawer';
+import { Drawer, DrawerContentScrollView, DrawerItem } from 'expo-router/drawer';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
-import { ActivityIndicator, AppState, Image, StyleSheet, Text, View } from 'react-native';
+import { AppState, Image, StyleSheet, Text, View } from 'react-native';
 
-import { api, clearAuthToken, logout } from '../../src/api/client';
+import { api, logout } from '../../src/api/client';
 import { useCleanifyAlert } from '../../src/components/CleanifyAlert';
 import { NotificationBadgeContext, useNotificationBadge } from '../../src/notifications/NotificationBadgeContext';
 
@@ -22,33 +22,8 @@ function CleanifyDrawerContent(props) {
   const router = useRouter();
   const { showAlert } = useCleanifyAlert();
   const pathname = usePathname();
-  const drawerStatus = useDrawerStatus();
-  const [user, setUser] = useState(null);
   const [loggingOut, setLoggingOut] = useState(false);
-  const [photoFailed, setPhotoFailed] = useState(false);
   const { unreadCount } = useNotificationBadge();
-
-  useEffect(() => {
-    let active = true;
-
-    api.get('/me')
-      .then((response) => {
-        if (active) {
-          setUser(response.data.user);
-          setPhotoFailed(false);
-        }
-      })
-      .catch(async (error) => {
-        if (error.response?.status === 401) {
-          await clearAuthToken();
-          router.replace('/login');
-        }
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [drawerStatus, pathname, router]);
 
   const goTo = (href) => {
     props.navigation.closeDrawer();
@@ -78,15 +53,8 @@ function CleanifyDrawerContent(props) {
   return (
     <DrawerContentScrollView {...props} contentContainerStyle={styles.drawerContent}>
       <View style={styles.drawerHeader}>
-        {user ? (
-          <>
-            {user.profile_photo_url && !photoFailed ? <Image source={{ uri: user.profile_photo_url }} style={styles.drawerPhoto} onError={() => setPhotoFailed(true)} /> : <View style={styles.avatar}><Text style={styles.avatarText}>{user.name?.charAt(0).toUpperCase()}</Text></View>}
-            <Text style={styles.userName}>{user.name}</Text>
-            <Text style={styles.userEmail}>{user.email}</Text>
-          </>
-        ) : (
-          <ActivityIndicator color="#17843f" />
-        )}
+        <Image source={require('../../assets/cleanify-logo.png')} style={styles.drawerLogo} resizeMode="contain" />
+        <Text style={styles.drawerBrand}>Cleanify</Text>
       </View>
 
       <View style={styles.drawerItems}>
@@ -180,12 +148,9 @@ export default function AuthenticatedDrawerLayout() {
 
 const styles = StyleSheet.create({
   drawerContent: { flex: 1, paddingTop: 0, backgroundColor: '#fbfcfb' },
-  drawerHeader: { minHeight: 174, backgroundColor: '#fbfcfb', paddingHorizontal: 20, paddingTop: 25, paddingBottom: 18, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 1, borderBottomColor: '#edf0ee' },
-  avatar: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#e4f4e8', borderWidth: 2, borderColor: '#fff', alignItems: 'center', justifyContent: 'center', marginBottom: 9 },
-  drawerPhoto: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#e4f4e8', borderWidth: 2, borderColor: '#fff', marginBottom: 9 },
-  avatarText: { color: '#17843f', fontSize: 24, fontWeight: '800' },
-  userName: { color: '#18211c', fontSize: 16, fontWeight: '700', textAlign: 'center' },
-  userEmail: { marginTop: 3, color: '#7b8580', fontSize: 11, textAlign: 'center' },
+  drawerHeader: { height: 104, backgroundColor: '#fbfcfb', paddingHorizontal: 20, paddingVertical: 8, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 1, borderBottomColor: '#edf0ee' },
+  drawerLogo: { width: 64, height: 54 },
+  drawerBrand: { marginTop: 5, color: '#18211c', fontSize: 18, lineHeight: 22, fontWeight: '700', textAlign: 'center' },
   drawerItems: { flex: 1, paddingTop: 8, paddingHorizontal: 8 },
   drawerItem: { minHeight: 40, borderRadius: 10, marginVertical: 1 },
   logoutItem: { backgroundColor: '#fff5f5' },

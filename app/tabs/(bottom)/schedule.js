@@ -42,7 +42,6 @@ function PickupCard({ pickup }) {
 function scheduleReminderMessage(preferences) {
   if (!preferences) return null;
   if (!preferences.schedule_reminders) return 'Schedule reminders are currently turned off.';
-  if (preferences.email_notifications) return "We'll remind you by email 1 day before your scheduled collection.";
   return 'Schedule reminders are enabled. Manage your reminder options in Settings.';
 }
 
@@ -83,11 +82,10 @@ export default function ScheduleScreen() {
       const { data } = await api.get('/settings');
       const notifications = data.notifications;
 
-      if (typeof notifications?.schedule_reminders !== 'boolean' || typeof notifications?.email_notifications !== 'boolean') return;
+      if (typeof notifications?.schedule_reminders !== 'boolean') return;
 
       setReminderPreferences({
         schedule_reminders: notifications.schedule_reminders,
-        email_notifications: notifications.email_notifications,
       });
     } catch {
       // Schedule content remains available when reminder preferences cannot be loaded.

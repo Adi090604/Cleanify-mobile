@@ -672,7 +672,6 @@ export default function SettingsScreen() {
 
         <Section title="Notification Preferences">
           <Text style={styles.subheading}>Global Settings</Text>
-          <PreferenceRow label="Email Notifications" value={notifications.email_notifications} onValueChange={(value) => setNotificationPreference('email_notifications', value)} disabled={saving !== null} />
           <PreferenceRow label="SMS Notifications" value={notifications.sms_notifications} onValueChange={(value) => setNotificationPreference('sms_notifications', value)} disabled={saving !== null} />
           <Text style={styles.subheading}>Notification Categories</Text>
           <PreferenceRow label="Report Updates" value={notifications.report_updates} onValueChange={(value) => setNotificationPreference('report_updates', value)} disabled={saving !== null} />

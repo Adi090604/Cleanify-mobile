@@ -14,6 +14,7 @@ export default function SignupScreen() {
   const { showAlert } = useCleanifyAlert();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirmation, setPasswordConfirmation] = useState('');
   const [errors, setErrors] = useState({});
@@ -44,6 +45,7 @@ export default function SignupScreen() {
       const { data } = await api.post('/auth/register', {
         name: name.trim(),
         email: email.trim().toLowerCase(),
+        phone: phone.trim(),
         password,
         password_confirmation: passwordConfirmation,
       });
@@ -109,6 +111,10 @@ export default function SignupScreen() {
           <Text style={styles.label}>Email address</Text>
           <TextInput style={[styles.input, firstError(errors, 'email') && styles.inputError]} placeholder="Enter your email" placeholderTextColor="#9ca3af" keyboardType="email-address" autoCapitalize="none" autoCorrect={false} autoComplete="email" value={email} onChangeText={updateField('email', setEmail)} editable={!loading} />
           {firstError(errors, 'email') ? <Text style={styles.errorText}>{firstError(errors, 'email')}</Text> : null}
+
+          <Text style={styles.label}>Mobile number</Text>
+          <TextInput style={[styles.input, firstError(errors, 'phone') && styles.inputError]} placeholder="09171234567 or +639171234567" placeholderTextColor="#9ca3af" keyboardType="phone-pad" autoCapitalize="none" autoCorrect={false} autoComplete="tel" textContentType="telephoneNumber" value={phone} onChangeText={updateField('phone', setPhone)} editable={!loading} />
+          {firstError(errors, 'phone') ? <Text style={styles.errorText}>{firstError(errors, 'phone')}</Text> : null}
 
           <Text style={styles.label}>Password</Text>
           <TextInput style={[styles.input, firstError(errors, 'password') && styles.inputError]} placeholder="Create a password" placeholderTextColor="#9ca3af" secureTextEntry autoComplete="new-password" value={password} onChangeText={updateField('password', setPassword)} editable={!loading} />

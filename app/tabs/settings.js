@@ -88,7 +88,8 @@ const LOCATION_PICKER_HTML = `<!DOCTYPE html>
           && latitude >= -90
           && latitude <= 90
           && longitude >= -180
-          && longitude <= 180;
+          && longitude <= 180
+          && !(latitude === 0 && longitude === 0);
       }
 
       function notify(latitude, longitude) {
@@ -151,7 +152,8 @@ function isValidCoordinate(latitude, longitude) {
     && latitude >= -90
     && latitude <= 90
     && longitude >= -180
-    && longitude <= 180;
+    && longitude <= 180
+    && !(latitude === 0 && longitude === 0);
 }
 
 function Section({ title, children }) {
@@ -390,7 +392,8 @@ export default function SettingsScreen() {
       const permission = await Location.requestForegroundPermissionsAsync();
 
       if (permission.status !== 'granted') {
-        setLocationMessage('Location is optional. You can submit this request without it.');
+        setLocationMessage('Location access was denied. You can select the requested service location manually on the map.');
+        setLocationMapVisible(true);
         return;
       }
 
@@ -418,7 +421,8 @@ export default function SettingsScreen() {
         `);
       }
     } catch {
-      setLocationMessage('Your location could not be captured. You can still submit without it.');
+      setLocationMessage("We couldn't determine your location. Please try again or select it manually on the map.");
+      setLocationMapVisible(true);
     } finally {
       setGettingLocation(false);
     }
@@ -481,7 +485,7 @@ export default function SettingsScreen() {
 
       if (message.type === 'map-error') {
         setLocationMapReady(false);
-        setLocationMapError('The map could not load. You can still use GPS coordinates or submit without a location.');
+        setLocationMapError('The map could not load. Please retry the map or use your current location.');
       }
     } catch {
       // Ignore malformed or unrelated WebView messages.
@@ -508,6 +512,9 @@ export default function SettingsScreen() {
     else if (barangay.length > 255) errors.barangay = 'Barangay must be 255 characters or fewer.';
     if (address.length > 255) errors.address = 'Address / Landmark must be 255 characters or fewer.';
     if (details.length > 2000) errors.details = 'Additional Details must be 2,000 characters or fewer.';
+    if (!coordinate || !isValidCoordinate(coordinate.latitude, coordinate.longitude)) {
+      errors.latitude = 'Please select the requested service location.';
+    }
 
     setRequestFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -741,7 +748,7 @@ export default function SettingsScreen() {
               />
               <FieldError value={requestFormErrors.address} />
 
-              <Text style={styles.label}>Location</Text>
+              <Text style={styles.label}>Requested Service Location *</Text>
               <View style={styles.locationActions}>
                 <TouchableOpacity style={styles.locationButton} onPress={useMyLocation} disabled={gettingLocation}>
                   {gettingLocation ? <ActivityIndicator size="small" color="#17843f" /> : <FontAwesome5 name="crosshairs" size={14} color="#17843f" />}
@@ -754,8 +761,9 @@ export default function SettingsScreen() {
                   </TouchableOpacity>
                 ) : null}
               </View>
-              <Text style={styles.locationHelp}>Optional. Location access is requested only when you tap the button.</Text>
+              <Text style={styles.locationHelp}>Use your current location or select and review a point on the map.</Text>
               {locationMessage ? <Text style={styles.locationMessage}>{locationMessage}</Text> : null}
+              <FieldError value={requestFormErrors.latitude || requestFormErrors.longitude} />
 
               {locationMapVisible ? (
                 <>
@@ -772,7 +780,7 @@ export default function SettingsScreen() {
                       onMessage={handleLocationMapMessage}
                       onError={() => {
                         setLocationMapReady(false);
-                        setLocationMapError('The map could not load. You can still use GPS coordinates or submit without a location.');
+                        setLocationMapError('The map could not load. Please retry the map or use your current location.');
                       }}
                     />
                     {!locationMapReady && !locationMapError ? (

@@ -47,7 +47,8 @@ const LEAFLET_MAP_HTML = `<!DOCTYPE html>
           && lat >= -90
           && lat <= 90
           && lng >= -180
-          && lng <= 180;
+          && lng <= 180
+          && !(lat === 0 && lng === 0);
       }
 
       function setLocation(lat, lng, centerMap) {
@@ -99,7 +100,8 @@ function isValidCoordinate(latitude, longitude) {
     && latitude >= -90
     && latitude <= 90
     && longitude >= -180
-    && longitude <= 180;
+    && longitude <= 180
+    && !(latitude === 0 && longitude === 0);
 }
 
 const IMAGE_MIME_TYPES = {
@@ -288,6 +290,10 @@ export default function ReportScreen() {
       showAlert({ type: 'warning', title: 'Specific Location Required', message: 'Please enter the specific location or a nearby landmark.' });
       return;
     }
+    if (!coordinate || !isValidCoordinate(coordinate.latitude, coordinate.longitude)) {
+      showAlert({ type: 'warning', title: 'Report Location Required', message: 'Please select the report location before submitting.' });
+      return;
+    }
     if (!description.trim()) {
       showAlert({ type: 'warning', title: 'Description Required', message: 'Please describe the issue.' });
       return;
@@ -297,10 +303,8 @@ export default function ReportScreen() {
     form.append('barangay', barangay.trim());
     form.append('location', location.trim());
     form.append('description', description.trim());
-    if (coordinate) {
-      form.append('latitude', coordinate.latitude.toFixed(8));
-      form.append('longitude', coordinate.longitude.toFixed(8));
-    }
+    form.append('latitude', coordinate.latitude.toFixed(8));
+    form.append('longitude', coordinate.longitude.toFixed(8));
     if (photo) form.append('image', reportImageFile(photo));
 
     try {
@@ -334,9 +338,7 @@ export default function ReportScreen() {
         showAlert({
           type: 'warning',
           title: 'Location Permission Needed',
-          message: permission.canAskAgain
-            ? 'Allow location access to place the report marker at your current position.'
-            : 'Location access is disabled. You can enable it for Cleanify in your device settings.',
+          message: 'Location access was denied. You can select the report location manually on the map.',
         });
         return;
       }
@@ -362,7 +364,7 @@ export default function ReportScreen() {
       showAlert({
         type: 'error',
         title: 'Unable to Get Location',
-        message: 'Make sure location services are enabled, then try again. Your previously selected location was not changed.',
+        message: "We couldn't determine your location. Please try again or select it manually on the map.",
       });
     } finally {
       setGettingLocation(false);
@@ -396,12 +398,12 @@ export default function ReportScreen() {
           <TextInput style={styles.input} value={barangay} onChangeText={setBarangay} maxLength={255} placeholder="Enter barangay" />
           <Text style={styles.label}>Specific Location / Landmark *</Text>
           <TextInput style={styles.input} value={location} onChangeText={setLocation} maxLength={255} placeholder="e.g. Purok 3, beside Barangay Hall" />
-          <Text style={styles.label}>GPS Location (optional)</Text>
-          <Text style={styles.help}>Tap or drag the marker to select the issue location.</Text>
+          <Text style={styles.label}>Report Location *</Text>
+          <Text style={styles.help}>Use your current location or tap and drag the marker to select the issue location.</Text>
           <TouchableOpacity
-            style={[styles.locationButton, (gettingLocation || mapLoading || mapError) && styles.disabled]}
+            style={[styles.locationButton, gettingLocation && styles.disabled]}
             onPress={useMyLocation}
-            disabled={gettingLocation || mapLoading || mapError}
+            disabled={gettingLocation}
             activeOpacity={0.75}
           >
             {gettingLocation ? (
